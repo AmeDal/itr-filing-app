@@ -18,7 +18,16 @@ export const apiService = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      let error;
+      try {
+        error = await response.json();
+      } catch {
+        throw new Error('We are unable to process your document at this time. Please try again later.');
+      }
+      
+      if (response.status === 400) {
+        throw new Error('We are unable to process your document at this time. Please try again later.');
+      }
       throw new Error(error.detail || 'Failed to extract document');
     }
 
@@ -38,7 +47,16 @@ export const apiService = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      let error;
+      try {
+        error = await response.json();
+      } catch {
+        throw new Error('We are unable to process your request at this time. Please try again later.');
+      }
+      
+      if (response.status === 400) {
+        throw new Error('We are unable to process your request at this time. Please try again later.');
+      }
       throw new Error(error.detail || 'Failed to create taxpayer');
     }
 
@@ -59,7 +77,16 @@ export const apiService = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      let error;
+      try {
+        error = await response.json();
+      } catch {
+        throw new Error('We are unable to process your request at this time. Please try again later.');
+      }
+      
+      if (response.status === 400) {
+        throw new Error('We are unable to process your request at this time. Please try again later.');
+      }
       throw new Error(error.detail || 'Failed to link Aadhar');
     }
 
