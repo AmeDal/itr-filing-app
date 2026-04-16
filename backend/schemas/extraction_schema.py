@@ -35,3 +35,25 @@ class AadharExtractionResponse(BaseModel):
     error_message: Optional[str] = Field(None, description="If is_error is true, describe why (e.g. 'Image too blurry', 'Not an Aadhar card').")
     extraction_data: Optional[AadharExtractionSchema] = Field(None, description="The extracted data if is_error is false.")
 
+
+class BatchExtractionInitiatedResponse(BaseModel):
+    batch_id: str
+    message: str = "Batch extraction initiated in the background."
+
+
+class DocumentStatusResponse(BaseModel):
+    id: str
+    batch_id: str
+    doc_type: Optional[str] = None
+    status: str  # queued, extracting, completed, error
+    error_message: Optional[str] = None
+    extraction_data: Optional[dict] = None  # Generic dict since it could be PAN or Aadhar
+    created_at: str
+
+
+class BatchStatusResponse(BaseModel):
+    batch_id: str
+    documents: list[DocumentStatusResponse]
+    is_completed: bool # True if all documents in the batch are completed or errored
+
+

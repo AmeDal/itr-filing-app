@@ -26,15 +26,26 @@ async def init_db():
         await db.execute('''
             CREATE TABLE IF NOT EXISTS documents (
                 id TEXT PRIMARY KEY,
+                batch_id TEXT,
                 pan_number TEXT,
                 doc_type TEXT,
                 file_path TEXT,
                 extracted_data TEXT,
                 status TEXT,
+                error_message TEXT,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (pan_number) REFERENCES taxpayers (pan_number)
             )
         ''')
+
+        # Add columns if they don't exist (primitive migration)
+        cursor = await db.execute("PRAGMA table_info(documents)")
+        columns = [row[1] for row in await cursor.fetchall()]
+        if "batch_id" not in columns:
+            await db.execute("ALTER TABLE documents ADD COLUMN batch_id TEXT")
+        if "error_message" not in columns:
+            await db.execute("ALTER TABLE documents ADD COLUMN error_message TEXT")
+
         await db.commit()
 
 

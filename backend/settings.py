@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-pro-latest"
+    gemini_model: str = "gemini-3-flash-preview"
     debug: bool = False
 
     class Config:
@@ -15,4 +15,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
