@@ -12,27 +12,23 @@ export const apiService = {
     formData.append('file', file);
     formData.append('doc_type', docType);
 
-    const response = await fetch(`${API_BASE_URL}/extract/document`, {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/extract/document`, {
+        method: 'POST',
+        body: formData,
+      });
 
-    if (!response.ok) {
-      let error;
-      try {
-        error = await response.json();
-      } catch {
+      if (!response.ok) {
         throw new Error('We are unable to process your document at this time. Please try again later.');
       }
-      
-      // For 400/500 errors, show a generic message to avoid leaking internal API details
-      if (response.status >= 400) {
-        throw new Error('We are unable to process your document at this time. Please try again later.');
+
+      return response.json();
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error('Network error. Please check your connection and try again.');
       }
-      throw new Error(error.detail || 'Failed to extract document');
+      throw err;
     }
-
-    return response.json();
   },
 
   /**
@@ -41,28 +37,24 @@ export const apiService = {
    * @returns {Promise<Object>}
    */
   async createTaxpayer(data) {
-    const response = await fetch(`${API_BASE_URL}/taxpayers/`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/taxpayers/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    if (!response.ok) {
-      let error;
-      try {
-        error = await response.json();
-      } catch {
+      if (!response.ok) {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
-      
-      // For 400/500 errors, show a generic message to avoid leaking internal API details
-      if (response.status >= 400) {
-        throw new Error('We are unable to process your request at this time. Please try again later.');
+
+      return response.json();
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error('Network error. Please check your connection and try again.');
       }
-      throw new Error(error.detail || 'Failed to create taxpayer');
+      throw err;
     }
-
-    return response.json();
   },
 
   /**
@@ -72,27 +64,23 @@ export const apiService = {
    * @returns {Promise<Object>}
    */
   async linkAadhar(panNumber, data) {
-    const response = await fetch(`${API_BASE_URL}/taxpayers/${panNumber}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
+    try {
+      const response = await fetch(`${API_BASE_URL}/taxpayers/${panNumber}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
 
-    if (!response.ok) {
-      let error;
-      try {
-        error = await response.json();
-      } catch {
+      if (!response.ok) {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
-      
-      // For 400/500 errors, show a generic message to avoid leaking internal API details
-      if (response.status >= 400) {
-        throw new Error('We are unable to process your request at this time. Please try again later.');
+
+      return response.json();
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new Error('Network error. Please check your connection and try again.');
       }
-      throw new Error(error.detail || 'Failed to link Aadhar');
+      throw err;
     }
-
-    return response.json();
   }
 };
