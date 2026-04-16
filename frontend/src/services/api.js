@@ -25,7 +25,8 @@ export const apiService = {
         throw new Error('We are unable to process your document at this time. Please try again later.');
       }
       
-      if (response.status === 400) {
+      // For 400/500 errors, show a generic message to avoid leaking internal API details
+      if (response.status >= 400) {
         throw new Error('We are unable to process your document at this time. Please try again later.');
       }
       throw new Error(error.detail || 'Failed to extract document');
@@ -54,7 +55,8 @@ export const apiService = {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
       
-      if (response.status === 400) {
+      // For 400/500 errors, show a generic message to avoid leaking internal API details
+      if (response.status >= 400) {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
       throw new Error(error.detail || 'Failed to create taxpayer');
@@ -84,7 +86,8 @@ export const apiService = {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
       
-      if (response.status === 400) {
+      // For 400/500 errors, show a generic message to avoid leaking internal API details
+      if (response.status >= 400) {
         throw new Error('We are unable to process your request at this time. Please try again later.');
       }
       throw new Error(error.detail || 'Failed to link Aadhar');

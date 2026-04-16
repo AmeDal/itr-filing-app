@@ -7,9 +7,7 @@ from google.genai import types
 from google.genai.errors import APIError
 
 from backend.schemas.extraction_schema import (AadharExtractionResponse,
-                                               AadharExtractionSchema,
-                                               PanExtractionResponse,
-                                               PanExtractionSchema)
+                                               PanExtractionResponse)
 from backend.settings import get_settings
 
 logger = logging.getLogger(__name__)
