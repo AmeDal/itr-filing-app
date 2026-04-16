@@ -68,10 +68,8 @@ async def extract_pan_data(image_bytes: bytes,
     contents = []
     if mime_type == "application/pdf":
         doc = fitz.open(stream=image_bytes, filetype="pdf")
-        zoom = 2.77
-        mat = fitz.Matrix(zoom, zoom)
         for page in doc:
-            pix = page.get_pixmap(matrix=mat)
+            pix = page.get_pixmap(dpi=200)
             png_bytes = pix.tobytes("png")
             contents.append(
                 types.Part.from_bytes(data=png_bytes, mime_type="image/png"))
@@ -94,7 +92,7 @@ async def extract_pan_data(image_bytes: bytes,
 
 
 async def extract_aadhar_data(image_bytes: bytes,
-                               mime_type: str) -> AadharExtractionResponse:
+                              mime_type: str) -> AadharExtractionResponse:
     client = get_client()
     settings = get_settings()
     prompt = "Analyze the provided document(s). If they do not represent a valid Aadhar card, set is_error to true and explain why. Otherwise, set is_error to false and extract the details into extraction_data. Respond with a strict JSON. Ensure all dates are YYYY-MM-DD."
@@ -102,10 +100,8 @@ async def extract_aadhar_data(image_bytes: bytes,
     contents = []
     if mime_type == "application/pdf":
         doc = fitz.open(stream=image_bytes, filetype="pdf")
-        zoom = 2.77
-        mat = fitz.Matrix(zoom, zoom)
         for page in doc:
-            pix = page.get_pixmap(matrix=mat)
+            pix = page.get_pixmap(dpi=200)
             png_bytes = pix.tobytes("png")
             contents.append(
                 types.Part.from_bytes(data=png_bytes, mime_type="image/png"))
