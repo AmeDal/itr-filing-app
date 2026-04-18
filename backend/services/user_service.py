@@ -1,77 +1,98 @@
 import logging
-from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
-from backend.db import DatabaseManager
-from backend.schemas.user_schema import (UserCreateRequest, 
-                                        UserLinkAadharRequest, 
-                                        UserResponse)
+from bson import ObjectId
+
+from backend.db import DatabaseManager, generate_oid
+from backend.schemas.user_schema import UserCreateRequest, UserLoginRequest, UserResponse
+from backend.security import hash_password, verify_password
+from backend.utils import now_ist
 
 logger = logging.getLogger(__name__)
 
-async def create_or_update_user(req: UserCreateRequest) -> UserResponse:
-    """
-    Upserts a user based on PAN number.
-    """
-    async with DatabaseManager.get_db() as db:
-        now = datetime.now().isoformat()
-        
-        await db.execute('''
-            INSERT INTO users (pan_number, full_name, dob, father_name, updated_at)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(pan_number) DO UPDATE SET
-                full_name = excluded.full_name,
-                dob = excluded.dob,
-                father_name = excluded.father_name,
-                updated_at = excluded.updated_at
-        ''', (
-            req.pan_number, 
-            req.full_name, 
-            req.dob.isoformat() if req.dob else None, 
-            req.father_name,
-            now
-        ))
-        await db.commit()
-        
-        return await get_user_by_pan(req.pan_number)
 
-async def link_aadhar(pan_number: str, req: UserLinkAadharRequest) -> UserResponse:
+async def create_user(req: UserCreateRequest) -> UserResponse:
     """
-    Links Aadhar data to user.
+    Creates a new user in MongoDB with a hashed password.
     """
-    async with DatabaseManager.get_db() as db:
-        now = datetime.now().isoformat()
-        
-        user = await get_user_by_pan(pan_number)
-        if not user:
-            raise ValueError(f"User with PAN {pan_number} not found")
-            
-        await db.execute('''
-            UPDATE users
-            SET aadhar_number = ?, gender = ?, address_line = ?, pincode = ?, updated_at = ?
-            WHERE pan_number = ?
-        ''', (
-            req.aadhar_number, 
-            req.gender, 
-            req.address_line, 
-            req.pincode, 
-            now,
-            pan_number
-        ))
-        await db.commit()
-        
-        return await get_user_by_pan(pan_number)
+    db = DatabaseManager.get_db()
 
-async def get_user_by_pan(pan_number: str) -> Optional[UserResponse]:
-    async with DatabaseManager.get_db() as db:
-        async with db.execute('SELECT * FROM users WHERE pan_number = ?', (pan_number,)) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                return UserResponse.model_validate(dict(row))
+    existing = await db.users.find_one({
+        "$or": [
+            {"pan_number": req.pan_number.upper()},
+            {"email": req.email.lower()}
+        ]
+    })
+
+    if existing:
+        if existing["pan_number"] == req.pan_number.upper():
+            raise ValueError("A user with this PAN already exists.")
+
+        raise ValueError("A user with this email already exists.")
+
+    user_id = generate_oid(
+        req.first_name,
+        req.middle_name,
+        req.last_name,
+        req.pan_number,
+        req.aadhar_number,
+        req.aadhar_pincode,
+        req.mobile_number,
+        req.email
+    )
+
+    user_doc = {
+        "_id": user_id,
+        "first_name": req.first_name,
+        "middle_name": req.middle_name,
+        "last_name": req.last_name,
+        "pan_number": req.pan_number.upper(),
+        "aadhar_number": req.aadhar_number,
+        "aadhar_pincode": req.aadhar_pincode,
+        "mobile_number": req.mobile_number,
+        "email": req.email.lower(),
+        "password": hash_password(req.password),
+        "created_at": now_ist(),
+        "updated_at": None
+    }
+
+    await db.users.insert_one(user_doc)
+    return UserResponse(**user_doc)
+
+
+async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
+    """
+    Verifies user credentials (PAN + Hashed Password).
+    """
+    db = DatabaseManager.get_db()
+
+    user_doc = await db.users.find_one({"pan_number": req.pan_number.upper()})
+
+    if user_doc and verify_password(req.password, user_doc["password"]):
+        return UserResponse(**user_doc)
+
     return None
 
-async def list_all_users() -> List[UserResponse]:
-    async with DatabaseManager.get_db() as db:
-        async with db.execute('SELECT * FROM users ORDER BY created_at DESC') as cursor:
-            rows = await cursor.fetchall()
-            return [UserResponse.model_validate(dict(row)) for row in rows]
+
+async def get_user_by_pan(pan_number: str) -> Optional[UserResponse]:
+    db = DatabaseManager.get_db()
+
+    user_doc = await db.users.find_one({"pan_number": pan_number.upper()})
+    if user_doc:
+        return UserResponse(**user_doc)
+
+    return None
+
+
+async def get_user_by_oid(oid: str) -> Optional[UserResponse]:
+    db = DatabaseManager.get_db()
+
+    try:
+        user_doc = await db.users.find_one({"_id": ObjectId(oid)})
+    except Exception:
+        user_doc = await db.users.find_one({"_id": oid})
+
+    if user_doc:
+        return UserResponse(**user_doc)
+
+    return None
