@@ -28,6 +28,8 @@
 | `backend/controllers/` | `*_router.py` — route definitions only |
 | `backend/services/` | `*_service.py` — business logic, one file per task |
 | `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |
+| `backend/dal/` | `*_dal.py` — created only when `db.py` grows too large |
+| `backend/models/` | `*_model.py` — created only when >5 tables |
 
 ## Frontend (`frontend/`)
 
