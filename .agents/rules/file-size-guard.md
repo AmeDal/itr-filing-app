@@ -18,7 +18,7 @@ globs: ["backend/**/*.py", "frontend/src/**/*.jsx", "frontend/src/**/*.js"]
 | File growing too large | Extract to... |
 |---|---|
 | `db.py` | `dal/*_dal.py` per domain |
-| `schema.py` | `schema/*_schema.py` per domain |
+| `schema.py` | `schemas/*_schema.py` per domain |
 | A single service file | Multiple service files by sub-task |
 | `utils.py` | Domain-specific utility modules |
 | Page component with tabs | One sub-component per tab in `components/<page>/` |
