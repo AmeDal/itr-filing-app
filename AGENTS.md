@@ -9,7 +9,7 @@
 | `.gemini/GEMINI.md` | Project-level AI rules and architecture guidelines |
 | `.gemini/settings.json` | Antigravity context file configuration |
 | `.aiexclude` | Files excluded from AI context indexing |
-| `.agents/rules/` | Always-on enforcement rules (async, separation of concerns, file size) |
+| `.agents/rules/` | Always-on enforcement rules (async, separation of concerns, file size, PR branch) |
 | `.agents/workflows/` | Slash-command workflows (`/new-endpoint`, `/new-page`, `/pre-push`) |
 | `.agents/skills/` | Auto-activated skills (fastapi-backend, react-frontend) |
 | `AGENTS.md` | This file — codebase map |
