@@ -11,7 +11,7 @@ description: Activate this skill when the user is working on backend Python code
 backend/
 ├── controllers/     # Route definitions only
 ├── dal/             # Data Access Layer (when db.py grows)
-├── model/           # DB models (when >5 tables)
+├── models/          # DB models (when >5 tables)
 ├── schemas/         # Pydantic request + response schemas
 ├── services/        # Business logic (one file per task)
 ├── utils.py         # Shared helpers
