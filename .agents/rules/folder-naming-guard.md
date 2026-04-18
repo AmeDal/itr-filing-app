@@ -10,10 +10,12 @@ When creating or modifying backend files and folders in this project, you **MUST
 - `backend/controllers/` (for FastAPI routers)
 - `backend/schemas/` (for Pydantic response/request models)
 - `backend/services/` (for business logic)
+- `backend/models/` (for Database models, when > 5 tables)
 
 ## Strictly Prohibited Folder Names
 - ❌ `backend/routers/` -> Use `backend/controllers/` instead.
 - ❌ `backend/schema/` -> Use `backend/schemas/` instead.
 - ❌ `backend/service/` -> Use `backend/services/` instead.
+- ❌ `backend/model/` -> Use `backend/models/` instead.
 
 Do not drift from this pattern. Any violation of this rule will cause structural inconsistencies across the repository.
