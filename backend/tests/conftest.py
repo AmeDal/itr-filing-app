@@ -1,50 +1,69 @@
-import asyncio
 import pytest
+import asyncio
 from httpx import AsyncClient, ASGITransport
-from dotenv import load_dotenv
-
-# Force loading test variables BEFORE anything else initializes
-load_dotenv(".env.test", override=True)
+from pymongo import MongoClient
 
 from backend.main import app
 from backend.db import DatabaseManager
 from backend.settings import get_settings
 
+@pytest.fixture(scope="session")
+def event_loop():
+    """Create an instance of the default event loop for each test session."""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
+
 @pytest.fixture(scope="session", autouse=True)
-async def db_init():
+async def db_lifecycle(event_loop):
     """
-    Initializes the database using settings overridden by .env.test.
-    Runs once per test session.
+    Initializes the database for the test session and guarantees cleanup.
+    Pointed to the ephemeral 'itr_filing_integration_test' database.
     """
     settings = get_settings()
     
-    # CRITICAL SECURITY CHECK
-    if not settings.mongo_db_name.endswith("_test"):
-        raise RuntimeError(f"FATAL: Tests attempted to run against non-test DB: {settings.mongo_db_name}")
-        
-    await DatabaseManager.initialize()
-    yield
-    await DatabaseManager.close()
+    # CRITICAL SECURITY CHECK: Ensure we are NOT wiping production
+    if settings.mongo_db_name != "itr_filing_integration_test":
+        raise RuntimeError(f"FATAL: Tests attempted to run against unexpected DB: {settings.mongo_db_name}")
 
-@pytest.fixture(scope="function")
+    # Initialize connection
+    await DatabaseManager.initialize()
+    
+    yield
+    
+    # CLEANUP PHASE: Destroy the ephemeral test database
+    await DatabaseManager.close()
+    
+    # Use sync client for total destruction (bypassing Motor lifecycle issues during shutdown)
+    sync_client = MongoClient(settings.mongo_uri)
+    try:
+        # Attempt to drop the entire database
+        sync_client.drop_database(settings.mongo_db_name)
+    except Exception:
+        # Fallback: Individually drop collections if drop_database permission denied
+        db = sync_client[settings.mongo_db_name]
+        for collection in db.list_collection_names():
+            db.drop_collection(collection)
+    finally:
+        sync_client.close()
+
+@pytest.fixture(autouse=True)
 async def db_cleanup():
     """
-    Wipes the collections completely before each test guaranteeing isolation.
+    Clears collections between individual tests to ensure test isolation.
     """
     db = DatabaseManager.get_db()
-    await db.users.delete_many({})
-    await db.documents.delete_many({})
-    
-    # We must explicitly re-trigger seeding if needed by the app logic
-    await DatabaseManager._seed_admin_user()
-    
-    yield
+    # We don't drop the vault collections! Just the data.
+    collections_to_clear = ["users", "documents", "batches"]
+    for coll_name in collections_to_clear:
+        if coll_name in await db.list_collection_names():
+            await db[coll_name].delete_many({})
 
-@pytest.fixture(scope="function")
-async def async_client(db_cleanup):
-    """
-    HTTPX AsyncClient bound to the FastAPI application.
-    """
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+@pytest.fixture
+async def async_client():
+    """Returns an AsyncClient for testing the FastAPI application."""
+    async with AsyncClient(
+        transport=ASGITransport(app=app), 
+        base_url="http://test"
+    ) as client:
         yield client
