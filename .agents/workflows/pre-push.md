@@ -51,14 +51,22 @@ Fix any issues before proceeding.
 
 ---
 
-## Step 6: Refactoring Check
+## Step 6: Verify README.md
+
+1. Review `README.md` — ensure it reflects all noteworthy details usefull for developers starting top use this repo
+2. If any new features were added or existing functionality was changed, make incremental changes
+3. Do not drastically change this file as it will result in poor experience for developers
+
+---
+
+## Step 7: Refactoring Check
 
 1. Scan all files for any exceeding ~300 lines
 2. If found, flag them and refactor before pushing
 
 ---
 
-## Step 7: Run Python Refactor Workflow
+## Step 8: Run Python Refactor Workflow
 
 Trigger `/python-refactor` to clean up:
 - Unused imports
@@ -76,5 +84,6 @@ Trigger `/python-refactor` to clean up:
 - [ ] Frontend linting passes
 - [ ] Frontend builds successfully
 - [ ] `AGENTS.md` is up to date
+- [ ] `README.md` is up to date
 - [ ] No files exceed ~300 lines
 - [ ] Python refactor workflow completed
