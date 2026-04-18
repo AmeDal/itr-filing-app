@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db import DatabaseManager
-from backend.controllers import extraction_router, user_router
+from backend.controllers.extraction_router import router as extraction_router
+from backend.controllers.user_router import router as user_router
 
 
 @asynccontextmanager
