@@ -11,7 +11,6 @@
 - Do not drift from established design patterns (enforced by `.agents/rules/`)
 - All backend code must be async-compatible (enforced by `async-enforcement` rule)
 - Keep files under ~300 lines; refactor proactively (enforced by `file-size-guard` rule)
-- **Never execute terminal commands directly** — list them and wait for user to run
 - Update `AGENTS.md` whenever new files or folders are created
 
 ## Architecture Summary
