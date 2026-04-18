@@ -16,7 +16,7 @@
 
 ## Backend (`backend/`)
 
-> **Status:** Not yet created. Will follow the structure defined in `.gemini/GEMINI.md`.
+> **Status:** Created and aligned.
 
 | Path | Responsibility |
 |------|---------------|
@@ -26,8 +26,8 @@
 | `backend/db.py` | DB connection, table definitions, CRUD (while small) |
 | `backend/utils.py` | Shared helpers, compiled regex patterns |
 | `backend/controllers/` | `*_router.py` — route definitions only |
-| `backend/service/` | `*_service.py` — business logic, one file per task |
-| `backend/schema/` | `*_schema.py` — Pydantic request + response schemas |
+| `backend/services/` | `*_service.py` — business logic, one file per task |
+| `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |
 | `backend/dal/` | `*_dal.py` — created only when `db.py` grows too large |
 | `backend/model/` | `*_model.py` — created only when >5 tables |
 

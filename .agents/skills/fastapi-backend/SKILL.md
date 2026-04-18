@@ -12,8 +12,8 @@ backend/
 ├── controllers/     # Route definitions only
 ├── dal/             # Data Access Layer (when db.py grows)
 ├── model/           # DB models (when >5 tables)
-├── schema/          # Pydantic request + response schemas
-├── service/         # Business logic (one file per task)
+├── schemas/         # Pydantic request + response schemas
+├── services/        # Business logic (one file per task)
 ├── utils.py         # Shared helpers
 ├── db.py            # DB connection + CRUD (while small)
 ├── logger.py        # Unified logger
@@ -98,9 +98,9 @@ def setup_logger(name: str = "app") -> logging.Logger:
 
 ### Service Pattern
 ```python
-# service/user_service.py
+# services/user_service.py
 from db import get_user_by_id, insert_user
-from schema.user_schema import CreateUserRequest
+from schemas.user_schema import CreateUserRequest
 
 async def create_user(req: CreateUserRequest) -> dict:
     # Business logic here — validation, transformation, orchestration
@@ -118,8 +118,8 @@ async def get_user(user_id: int) -> dict:
 ```python
 # controllers/user_router.py
 from fastapi import APIRouter, HTTPException
-from schema.user_schema import CreateUserRequest, UserResponse
-from service.user_service import create_user, get_user
+from schemas.user_schema import CreateUserRequest, UserResponse
+from services.user_service import create_user, get_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 

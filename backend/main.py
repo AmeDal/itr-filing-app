@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.db import init_db
-from backend.routers import extraction_router, taxpayer_router
+from backend.controllers import extraction_router, taxpayer_router
 
 
 @asynccontextmanager

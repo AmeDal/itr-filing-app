@@ -10,7 +10,7 @@ Follow these steps **in order** when adding a new API endpoint.
 
 ## Step 1: Define Schema
 
-Open or create `backend/schema/*_schema.py` for the relevant domain.
+Open or create `backend/schemas/*_schema.py` for the relevant domain.
 
 1. Create a **request** Pydantic model (if the endpoint accepts a body)
 2. Create a **response** Pydantic model
@@ -33,7 +33,7 @@ class UserResponse(BaseModel):
 
 ## Step 2: Create Service
 
-Open or create `backend/service/*_service.py` for the logical task.
+Open or create `backend/services/*_service.py` for the logical task.
 
 1. Implement the business logic as an `async def` function
 2. Call `db.py` or `dal/` for data access — never write SQL here
@@ -57,8 +57,8 @@ Open or create `backend/controllers/*_router.py`.
 
 ```python
 from fastapi import APIRouter
-from schema.user_schema import CreateUserRequest, UserResponse
-from service.user_service import create_user
+from schemas.user_schema import CreateUserRequest, UserResponse
+from services.user_service import create_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
