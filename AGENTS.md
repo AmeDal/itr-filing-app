@@ -9,7 +9,7 @@
 | `.gemini/GEMINI.md` | Project-level AI rules and architecture guidelines |
 | `.gemini/settings.json` | Antigravity context file configuration |
 | `.aiexclude` | Files excluded from AI context indexing |
-| `.agents/rules/` | Always-on enforcement rules (async, separation of concerns, file size) |
+| `.agents/rules/` | Always-on enforcement rules (async, separation of concerns, file size, PR branch) |
 | `.agents/workflows/` | Slash-command workflows (`/new-endpoint`, `/new-page`, `/pre-push`) |
 | `.agents/skills/` | Auto-activated skills (fastapi-backend, react-frontend) |
 | `AGENTS.md` | This file — codebase map |
@@ -28,6 +28,8 @@
 | `backend/controllers/` | `*_router.py` — route definitions only |
 | `backend/services/` | `*_service.py` — business logic, one file per task |
 | `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |
+| `backend/dal/` | `*_dal.py` — created only when `db.py` grows too large |
+| `backend/models/` | `*_model.py` — created only when >5 tables |
 
 ## Frontend (`frontend/`)
 

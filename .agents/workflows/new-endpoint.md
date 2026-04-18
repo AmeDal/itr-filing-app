@@ -19,6 +19,7 @@ Open or create `backend/schemas/*_schema.py` for the relevant domain.
 ```python
 from pydantic import BaseModel
 
+
 class CreateUserRequest(BaseModel):
     name: str
     email: str
@@ -61,6 +62,7 @@ from schemas.user_schema import CreateUserRequest, UserResponse
 from services.user_service import create_user
 
 router = APIRouter(prefix="/users", tags=["users"])
+
 
 @router.post("/", response_model=UserResponse)
 async def create_user_endpoint(req: CreateUserRequest):

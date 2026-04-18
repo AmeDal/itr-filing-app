@@ -5,7 +5,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, Form, BackgroundTasks
 
-from backend.db import get_db_connection
+from backend.db import DatabaseManager
 from backend.services.llm_service import extract_pan_data, extract_aadhar_data
 from backend.services.batch_service import initialize_batch, process_batch_extraction
 from backend.schemas.extraction_schema import (BatchExtractionInitiatedResponse, 
@@ -89,7 +89,7 @@ async def extract_batch_docs(
 
 @router.get("/status/{batch_id}", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str):
-    async with get_db_connection() as db:
+    async with DatabaseManager.get_db() as db:
         cursor = await db.execute(
             "SELECT * FROM documents WHERE batch_id = ? ORDER BY created_at ASC",
             (batch_id,)

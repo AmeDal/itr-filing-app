@@ -12,6 +12,7 @@
 - All backend code must be async-compatible (enforced by `async-enforcement` rule)
 - Keep files under ~300 lines; refactor proactively (enforced by `file-size-guard` rule)
 - Update `AGENTS.md` whenever new files or folders are created
+- Raise PRs against `development` branch by default (enforced by `pr-branch-policy` rule)
 
 ## Architecture Summary
 - **Backend layers:** Router → Service → DAL/db.py (enforced by `separation-of-concerns` rule)

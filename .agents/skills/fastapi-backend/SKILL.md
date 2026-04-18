@@ -29,6 +29,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: initialize DB connections, caches, etc.
@@ -53,6 +54,7 @@ app.add_middleware(
 from functools import lru_cache
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
     database_url: str
     api_key: str
@@ -60,6 +62,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -70,6 +73,7 @@ def get_settings() -> Settings:
 ```python
 import logging
 from pathlib import Path
+
 
 def setup_logger(name: str = "app") -> logging.Logger:
     logger = logging.getLogger(name)
@@ -102,10 +106,12 @@ def setup_logger(name: str = "app") -> logging.Logger:
 from db import get_user_by_id, insert_user
 from schemas.user_schema import CreateUserRequest
 
+
 async def create_user(req: CreateUserRequest) -> dict:
     # Business logic here — validation, transformation, orchestration
     user = await insert_user(req.name, req.email)
     return user
+
 
 async def get_user(user_id: int) -> dict:
     user = await get_user_by_id(user_id)
@@ -123,9 +129,11 @@ from services.user_service import create_user, get_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
+
 @router.post("/", response_model=UserResponse)
 async def create_user_endpoint(req: CreateUserRequest):
     return await create_user(req)
+
 
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user_endpoint(user_id: int):
@@ -153,6 +161,7 @@ Use FastAPI's `Depends()` for shared resources:
 ```python
 from fastapi import Depends
 from settings import Settings, get_settings
+
 
 @router.get("/config")
 async def get_config(settings: Settings = Depends(get_settings)):
