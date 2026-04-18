@@ -6,10 +6,12 @@ from typing import List, Optional
 
 from fastapi import UploadFile
 
-from backend.db import get_db_connection
+from backend.db import DatabaseManager
 from backend.schemas.extraction_schema import (AadharExtractionResponse,
                                                PanExtractionResponse)
 from backend.services.llm_service import extract_aadhar_data, extract_pan_data
+from backend.services import user_service
+from backend.schemas.user_schema import UserCreateRequest
 from backend.utils import map_error_to_friendly_message
 
 logger = logging.getLogger(__name__)
@@ -17,9 +19,9 @@ logger = logging.getLogger(__name__)
 
 async def process_single_document(doc_id: str, file_bytes: bytes, mime_type: str, password: Optional[str] = None):
     """
-    Handles extraction for a single document record.
+    Handles extraction for a single document record and links it to a user.
     """
-    async with get_db_connection() as db:
+    async with DatabaseManager.get_db() as db:
         try:
             # Update status to extracting
             await db.execute(
@@ -52,9 +54,25 @@ async def process_single_document(doc_id: str, file_bytes: bytes, mime_type: str
                     ("error", result.error_message, doc_id),
                 )
             else:
+                # Successfully extracted!
+                # 1. Upsert user logic (if it's a PAN card, we definitely want to create/update user)
+                user_id = None
+                if doc_type == "PAN":
+                    ext = result.extraction_data
+                    # Construct full_name
+                    full_name = f"{ext.first_name or ''} {ext.middle_name or ''} {ext.last_name or ''}".strip()
+                    user = await user_service.create_or_update_user(UserCreateRequest(
+                        pan_number=ext.pan_number,
+                        full_name=full_name,
+                        dob=ext.dob,
+                        father_name=ext.father_name
+                    ))
+                    user_id = user.user_id
+                
+                # 2. Update document with extracted data and user_id
                 await db.execute(
-                    "UPDATE documents SET status = ?, extracted_data = ? WHERE id = ?",
-                    ("completed", result.extraction_data.model_dump_json(), doc_id),
+                    "UPDATE documents SET status = ?, extracted_data = ?, user_id = ? WHERE id = ?",
+                    ("completed", result.extraction_data.model_dump_json(), user_id, doc_id),
                 )
             await db.commit()
 
@@ -92,7 +110,7 @@ async def initialize_batch(batch_id: str, files: List[UploadFile], doc_types: Li
     Saves initial records to DB and prepares file data for background task.
     """
     prepared_files = []
-    async with get_db_connection() as db:
+    async with DatabaseManager.get_db() as db:
         for file, doc_type, password in zip(files, doc_types, passwords):
             doc_id = str(uuid.uuid4())
             file_bytes = await file.read()

@@ -3,14 +3,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.db import init_db
-from backend.routers import extraction_router, taxpayer_router
+from backend.db import DatabaseManager
+from backend.controllers import extraction_router, user_router
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    await init_db()
+    await DatabaseManager.initialize()
     yield
     # Shutdown
     pass
@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 app.include_router(extraction_router, prefix="/api")
-app.include_router(taxpayer_router, prefix="/api")
+app.include_router(user_router, prefix="/api")
 
 
 @app.get("/api/v1/health")
