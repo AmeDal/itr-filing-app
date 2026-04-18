@@ -5,7 +5,8 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-3-flash-preview"
+    gemini_model: str = "gemini-2.0-flash"
+    db_path: str = "app.db"
     debug: bool = False
 
     class Config:

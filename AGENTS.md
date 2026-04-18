@@ -20,16 +20,14 @@
 
 | Path | Responsibility |
 |------|---------------|
-| `backend/main.py` | FastAPI app init, router registration, lifespan, CORS |
-| `backend/settings.py` | Pydantic BaseSettings singleton (constants, API keys, paths) |
+| `backend/main.py` | FastAPI app init, router registration, lifespan (DB init), CORS |
+| `backend/settings.py` | Pydantic BaseSettings singleton (including DB path) |
 | `backend/logger.py` | Unified logger → console + `logs/log.txt` |
-| `backend/db.py` | DB connection, table definitions, CRUD (while small) |
+| `backend/db.py` | DatabaseManager: STRICT schemas, WAL mode, integrity checks |
 | `backend/utils.py` | Shared helpers, compiled regex patterns |
-| `backend/controllers/` | `*_router.py` — route definitions only |
-| `backend/services/` | `*_service.py` — business logic, one file per task |
-| `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |
-| `backend/dal/` | `*_dal.py` — created only when `db.py` grows too large |
-| `backend/model/` | `*_model.py` — created only when >5 tables |
+| `backend/controllers/` | `user_router.py`, `extraction_router.py` |
+| `backend/services/` | `user_service.py` (business logic, UPSERTs), `batch_service.py` |
+| `backend/schemas/` | `user_schema.py`, `extraction_schema.py` |
 
 ## Frontend (`frontend/`)
 
