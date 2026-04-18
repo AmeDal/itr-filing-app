@@ -9,3 +9,9 @@ motor>=3.6.0
 dnspython>=2.6.0
 pymupdf>=1.23.0
 passlib[argon2,bcrypt]>=1.7.4
+pymongo[encryption]>=4.2
+
+# Testing Integration
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+httpx>=0.26.0

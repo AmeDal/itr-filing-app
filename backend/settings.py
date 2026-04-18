@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     mongo_uri: str = "http://localhost:27017"
     mongo_db_name: str = "itr_filing"
 
+    csfle_master_key: str = ""
+    csfle_key_vault_namespace: str = "encryption.__keyVault"
+
     seed_first_name: str = ""
     seed_middle_name: str = ""
     seed_last_name: str = ""

@@ -6,6 +6,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from backend.logger import logger
 from backend.security import hash_password
+from backend.services.crypto_service import CryptoService
 from backend.settings import get_settings
 from backend.utils import mask_uri, now_ist
 
@@ -68,6 +69,13 @@ class DatabaseManager:
             await cls.client.admin.command('ping')
             logger.info("Successfully connected to MongoDB")
 
+            # Initialize CryptoService for CSFLE
+            CryptoService.initialize(
+                mongo_uri=settings.mongo_uri,
+                master_key_b64=settings.csfle_master_key,
+                key_vault_namespace=settings.csfle_key_vault_namespace
+            )
+
             # Perform indexing and seeding
             await cls._ensure_indexes()
             await cls._seed_admin_user()
@@ -101,7 +109,19 @@ class DatabaseManager:
         if not existing:
             logger.info(f"Seeding initial user with _id: {user_id}")
             seed_data = seed_data.copy()
-            seed_data["password"] = hash_password(seed_data["password"])
+            
+            # Encrypt identity fields deterministically
+            identity_fields_to_encrypt = [
+                "first_name", "middle_name", "last_name", "pan_number", 
+                "aadhar_number", "aadhar_pincode", "mobile_number", "email"
+            ]
+            for field in identity_fields_to_encrypt:
+                if field in seed_data:
+                    seed_data[field] = await CryptoService.encrypt_deterministic(seed_data[field])
+            
+            plain_pwd = seed_data["password"]
+            hashed_pwd = hash_password(plain_pwd)
+            seed_data["password"] = await CryptoService.encrypt_random(hashed_pwd)
 
             user_doc = {
                 "_id": user_id,
@@ -123,6 +143,7 @@ class DatabaseManager:
     @classmethod
     async def close(cls):
         """Closes the MongoDB connection."""
+        CryptoService.close()
         if cls.client:
             cls.client.close()
             cls.client = None

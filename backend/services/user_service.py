@@ -6,10 +6,27 @@ from bson import ObjectId
 from backend.db import DatabaseManager, generate_oid
 from backend.schemas.user_schema import UserCreateRequest, UserLoginRequest, UserResponse
 from backend.security import hash_password, verify_password
+from backend.services.crypto_service import CryptoService
 from backend.utils import now_ist
 
 logger = logging.getLogger(__name__)
 
+async def decrypt_user_doc(user_doc: Optional[dict]) -> Optional[dict]:
+    """Helper to decrypt all encrypted fields in a user document before returning."""
+    if not user_doc:
+        return None
+        
+    doc = user_doc.copy()
+    fields_to_decrypt = [
+        "first_name", "middle_name", "last_name", "pan_number", 
+        "aadhar_number", "aadhar_pincode", "mobile_number", "email",
+        "password"
+    ]
+    for field in fields_to_decrypt:
+        if field in doc and doc[field] is not None:
+            doc[field] = await CryptoService.decrypt_field(doc[field])
+            
+    return doc
 
 async def create_user(req: UserCreateRequest) -> UserResponse:
     """
@@ -17,15 +34,19 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
     """
     db = DatabaseManager.get_db()
 
+    enc_pan = await CryptoService.encrypt_deterministic(req.pan_number.upper())
+    enc_email = await CryptoService.encrypt_deterministic(req.email.lower())
+
     existing = await db.users.find_one({
         "$or": [
-            {"pan_number": req.pan_number.upper()},
-            {"email": req.email.lower()}
+            {"pan_number": enc_pan},
+            {"email": enc_email}
         ]
     })
 
     if existing:
-        if existing["pan_number"] == req.pan_number.upper():
+        # Check against the search encrypted values
+        if existing["pan_number"] == enc_pan:
             raise ValueError("A user with this PAN already exists.")
 
         raise ValueError("A user with this email already exists.")
@@ -43,21 +64,22 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
 
     user_doc = {
         "_id": user_id,
-        "first_name": req.first_name,
-        "middle_name": req.middle_name,
-        "last_name": req.last_name,
-        "pan_number": req.pan_number.upper(),
-        "aadhar_number": req.aadhar_number,
-        "aadhar_pincode": req.aadhar_pincode,
-        "mobile_number": req.mobile_number,
-        "email": req.email.lower(),
-        "password": hash_password(req.password),
+        "first_name": await CryptoService.encrypt_deterministic(req.first_name),
+        "middle_name": await CryptoService.encrypt_deterministic(req.middle_name) if req.middle_name else None,
+        "last_name": await CryptoService.encrypt_deterministic(req.last_name),
+        "pan_number": enc_pan,
+        "aadhar_number": await CryptoService.encrypt_deterministic(req.aadhar_number),
+        "aadhar_pincode": await CryptoService.encrypt_deterministic(req.aadhar_pincode),
+        "mobile_number": await CryptoService.encrypt_deterministic(req.mobile_number),
+        "email": enc_email,
+        "password": await CryptoService.encrypt_random(hash_password(req.password)),
         "created_at": now_ist(),
         "updated_at": None
     }
 
     await db.users.insert_one(user_doc)
-    return UserResponse(**user_doc)
+    decrypted_doc = await decrypt_user_doc(user_doc)
+    return UserResponse(**decrypted_doc)
 
 
 async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
@@ -66,10 +88,14 @@ async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
     """
     db = DatabaseManager.get_db()
 
-    user_doc = await db.users.find_one({"pan_number": req.pan_number.upper()})
+    enc_pan = await CryptoService.encrypt_deterministic(req.pan_number.upper())
+    user_doc = await db.users.find_one({"pan_number": enc_pan})
 
-    if user_doc and verify_password(req.password, user_doc["password"]):
-        return UserResponse(**user_doc)
+    if user_doc and "password" in user_doc:
+        decrypted_hash = await CryptoService.decrypt_field(user_doc["password"])
+        if verify_password(req.password, decrypted_hash):
+            decrypted_doc = await decrypt_user_doc(user_doc)
+            return UserResponse(**decrypted_doc)
 
     return None
 
@@ -77,9 +103,11 @@ async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
 async def get_user_by_pan(pan_number: str) -> Optional[UserResponse]:
     db = DatabaseManager.get_db()
 
-    user_doc = await db.users.find_one({"pan_number": pan_number.upper()})
+    enc_pan = await CryptoService.encrypt_deterministic(pan_number.upper())
+    user_doc = await db.users.find_one({"pan_number": enc_pan})
     if user_doc:
-        return UserResponse(**user_doc)
+        decrypted_doc = await decrypt_user_doc(user_doc)
+        return UserResponse(**decrypted_doc)
 
     return None
 
@@ -93,6 +121,7 @@ async def get_user_by_oid(oid: str) -> Optional[UserResponse]:
         user_doc = await db.users.find_one({"_id": oid})
 
     if user_doc:
-        return UserResponse(**user_doc)
+        decrypted_doc = await decrypt_user_doc(user_doc)
+        return UserResponse(**decrypted_doc)
 
     return None
