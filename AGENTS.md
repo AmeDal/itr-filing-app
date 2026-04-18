@@ -1,6 +1,6 @@
 # ITR Filing App — Codebase Map
 
-> This file is the agent's primary navigation tool. Update it whenever new files or folders are created.
+> This file is the agent's primary navigation tool. Update it whenever new files or folders are created but dont remove existing info unless that has been changed too.
 
 ## Project Root
 
@@ -13,15 +13,17 @@
 | `.agents/workflows/` | Slash-command workflows (`/new-endpoint`, `/new-page`, `/pre-push`) |
 | `.agents/skills/` | Auto-activated skills (fastapi-backend, react-frontend) |
 | `AGENTS.md` | This file — codebase map |
+| `openspec/` | OpenSpec change artifacts (proposals, designs, specs, tasks) |
+| `.env` | All project secrets are stored here. Don't change the values here unless explicitly asked by user |
 
 ## Backend (`backend/`)
 
-> **Status:** Created and aligned.
+> **Status:** Migrated to Async MongoDB (`motor`).
 
 | Path | Responsibility |
 |------|---------------|
 | `backend/main.py` | FastAPI app init, router registration, lifespan, CORS |
-| `backend/settings.py` | Pydantic BaseSettings singleton (constants, API keys, paths) |
+| `backend/settings.py` | Pydantic BaseSettings singleton (constants, API keys, paths, credentials) |
 | `backend/logger.py` | Unified logger → console + `logs/log.txt` |
 | `backend/db.py` | DB connection, table definitions, CRUD (while small) |
 | `backend/utils.py` | Shared helpers, compiled regex patterns |
@@ -33,7 +35,7 @@
 
 ## Frontend (`frontend/`)
 
-> **Status:** Not yet created. Will follow the structure defined in `.gemini/GEMINI.md`.
+> **Status:** Redesigned with Dark Premium Auth UI.
 
 | Path | Responsibility |
 |------|---------------|

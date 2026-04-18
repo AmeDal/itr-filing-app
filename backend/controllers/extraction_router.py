@@ -1,19 +1,21 @@
+import json
 import logging
 import uuid
-import json
+from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, Form, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
 
 from backend.db import DatabaseManager
-from backend.services.llm_service import extract_pan_data, extract_aadhar_data
+from backend.schemas.extraction_schema import (
+    BatchExtractionInitiatedResponse,
+    BatchStatusResponse,
+    DocumentStatusResponse,
+)
 from backend.services.batch_service import initialize_batch, process_batch_extraction
-from backend.schemas.extraction_schema import (BatchExtractionInitiatedResponse, 
-                                               BatchStatusResponse, 
-                                               DocumentStatusResponse)
+from backend.services.llm_service import extract_aadhar_data, extract_pan_data
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/v1/extract", tags=["Extraction"])
 
 
@@ -33,9 +35,9 @@ async def extract_document(
         if doc_type.upper() == "PAN":
             data = await extract_pan_data(image_bytes, mime_type, password)
             return {"status": "success", "data": data}
-        else:
-            data = await extract_aadhar_data(image_bytes, mime_type, password)
-            return {"status": "success", "data": data}
+
+        data = await extract_aadhar_data(image_bytes, mime_type, password)
+        return {"status": "success", "data": data}
     except Exception:
         logger.exception("Document extraction failed")
         raise HTTPException(status_code=500, detail="Extraction failed")
@@ -48,7 +50,6 @@ async def extract_batch_docs(
     files: List[UploadFile] = File(...),
     passwords: Optional[str] = Form(None, description="JSON list of passwords")
 ):
-    # Parse doc_types
     try:
         dt_list = json.loads(doc_types)
         if not isinstance(dt_list, list):
@@ -58,9 +59,11 @@ async def extract_batch_docs(
 
     if len(dt_list) != len(files):
         logger.error(f"Mismatch: {len(dt_list)} types vs {len(files)} files")
-        raise HTTPException(status_code=400, detail=f"Number of doc_types ({len(dt_list)}) must match number of files ({len(files)})")
-    
-    # Parse passwords
+        raise HTTPException(
+            status_code=400,
+            detail=f"Number of doc_types ({len(dt_list)}) must match number of files ({len(files)})"
+        )
+
     p_list = [None] * len(files)
     if passwords:
         try:
@@ -72,52 +75,45 @@ async def extract_batch_docs(
         except Exception:
             p_list = [p.strip() if p.strip() else None for p in passwords.split(",")]
 
-    # Final normalization
     if len(p_list) < len(files):
         p_list.extend([None] * (len(files) - len(p_list)))
 
     batch_id = str(uuid.uuid4())
-    
-    # Initialize batch in DB and read files
     prepared_files = await initialize_batch(batch_id, files, [dt.upper() for dt in dt_list], p_list)
-    
-    # Queue background task
     background_tasks.add_task(process_batch_extraction, batch_id, prepared_files)
-    
+
     return BatchExtractionInitiatedResponse(batch_id=batch_id)
 
 
 @router.get("/status/{batch_id}", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str):
-    async with DatabaseManager.get_db() as db:
-        cursor = await db.execute(
-            "SELECT * FROM documents WHERE batch_id = ? ORDER BY created_at ASC",
-            (batch_id,)
-        )
-        rows = await cursor.fetchall()
-        
-        if not rows:
-            raise HTTPException(status_code=404, detail="Batch not found")
-        
-        documents = []
-        all_done = True
-        for row in rows:
-            status = row["status"]
-            if status in ["queued", "extracting"]:
-                all_done = False
-                
-            documents.append(DocumentStatusResponse(
-                id=row["id"],
-                batch_id=row["batch_id"],
-                doc_type=row["doc_type"],
-                status=status,
-                error_message=row["error_message"],
-                extraction_data=json.loads(row["extracted_data"]) if row["extracted_data"] else None,
-                created_at=row["created_at"]
-            ))
-            
-        return BatchStatusResponse(
-            batch_id=batch_id,
-            documents=documents,
-            is_completed=all_done
-        )
+    db = DatabaseManager.get_db()
+
+    cursor = db.documents.find({"batch_id": batch_id}).sort("created_at", 1)
+    rows = await cursor.to_list(length=100)
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    documents = []
+    all_done = True
+    for row in rows:
+        status = row["status"]
+        if status in ["queued", "extracting"]:
+            all_done = False
+
+        documents.append(DocumentStatusResponse(
+            id=row["id"],
+            batch_id=row["batch_id"],
+            doc_type=row.get("doc_type"),
+            status=status,
+            error_message=row.get("error_message"),
+            extraction_data=row.get("extracted_data"),
+            created_at=row["created_at"].isoformat() if isinstance(row["created_at"], (datetime, str)) else str(row["created_at"])
+        ))
+
+    return BatchStatusResponse(
+        batch_id=batch_id,
+        documents=documents,
+        is_completed=all_done
+    )

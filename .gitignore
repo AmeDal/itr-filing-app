@@ -9,7 +9,6 @@ venv.bak/
 
 # SQLite Databases
 *.sqlite3
-*.db
 
 # Python
 __pycache__/

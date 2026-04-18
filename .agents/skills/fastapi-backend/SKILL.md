@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
     # Shutdown: close connections
     await shutdown()
 
-app = FastAPI(title="ITR Filing App", lifespan=lifespan)
+app = FastAPI(title="ITR Filing App", prefix="/api", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -56,9 +56,9 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str
-    api_key: str
-    debug: bool = False
+    DATABASE_URL: str
+    API_KEY: str
+    DEBUG: bool = False
 
     class Config:
         env_file = ".env"
