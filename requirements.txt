@@ -10,6 +10,9 @@ dnspython>=2.6.0
 pymupdf>=1.23.0
 passlib[argon2,bcrypt]>=1.7.4
 pymongo[encryption]>=4.2
+sse-starlette>=2.0.0
+azure-storage-blob>=12.19.0
+aiohttp>=3.9.0
 
 # Testing Integration
 pytest>=8.0.0

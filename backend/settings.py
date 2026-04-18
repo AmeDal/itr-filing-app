@@ -20,6 +20,9 @@ class Settings(BaseSettings):
 
     csfle_master_key: str = ""
     csfle_key_vault_namespace: str = "encryption.__keyVault"
+    
+    azure_storage_connection_string: str = ""
+    azure_storage_container_name: str = "itr-extractions"
 
     seed_first_name: str = ""
     seed_middle_name: str = ""

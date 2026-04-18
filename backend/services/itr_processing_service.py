@@ -38,14 +38,19 @@ class SessionManager:
         if session_id in cls._sessions:
             doc = cls._sessions[session_id]["documents"].get(file_hash)
             if doc:
+                doc["total_pages"] = total_pages
                 if status == "completed_page":
                     doc["completed_pages"] += 1
-                    if doc["completed_pages"] == total_pages:
-                        doc["status"] = "completed"
+                elif status == "completed":
+                    doc["completed_pages"] = total_pages
+                    doc["status"] = "completed"
                 elif status == "failed_page":
                     doc["status"] = "failed"
                 else:
                     doc["status"] = status
+                
+                if doc["completed_pages"] == total_pages:
+                    doc["status"] = "completed"
                 
                 cls.broadcast(session_id)
 
@@ -70,7 +75,7 @@ class SessionManager:
         try:
             while True:
                 msg = await queue.get()
-                yield f"data: {msg}\n\n"
+                yield {"data": msg}
         finally:
             if session_id in cls._listeners:
                 cls._listeners[session_id].remove(queue)
@@ -114,7 +119,7 @@ class ITRProcessingService:
                 user_id, ay, doc_type, file_hash, total_pages
             )
             if is_complete:
-                SessionManager.update_progress(session_id, file_hash, total_pages, total_pages, status="completed_page")
+                SessionManager.update_progress(session_id, file_hash, total_pages, total_pages, status="completed")
                 return
 
         SessionManager.update_progress(session_id, file_hash, 0, total_pages, status="extracting")

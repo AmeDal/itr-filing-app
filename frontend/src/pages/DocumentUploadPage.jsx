@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
 import FileDropzone from '../components/upload/FileDropzone';
@@ -7,7 +7,12 @@ import { apiService } from '../services/api';
 const DocumentUploadPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { ay, itrType } = location.state || { ay: '2024-25', itrType: 'ITR-1' };
+    const { ay, itrType } = location.state || {};
+
+    // Safety check to ensure AY is present
+    useEffect(() => {
+        if (!ay) navigate('/itr-select');
+    }, [ay, navigate]);
 
     const [files, setFiles] = useState({
         FORM_26AS: [],

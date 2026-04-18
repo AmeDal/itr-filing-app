@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogIn, UserPlus, ArrowRight, ShieldCheck, Mail, Phone, Lock, Hash, MapPin, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { apiService } from '../services/api';
 
 const AuthPage = () => {
+    const navigate = useNavigate();
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -88,8 +90,8 @@ const AuthPage = () => {
                     </div>
                     <h1>Authenticated</h1>
                     <p className="subtitle">{success}</p>
-                    <button className="btn btn-primary" onClick={() => window.location.reload()}>
-                        Continue to Dashboard <ArrowRight size={18} />
+                    <button className="btn btn-primary" onClick={() => navigate('/itr-select')}>
+                        Continue to Filing <ArrowRight size={18} />
                     </button>
                 </div>
             </div>

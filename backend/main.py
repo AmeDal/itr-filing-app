@@ -4,8 +4,10 @@ from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.controllers.extraction_router import router as extraction_router
+from backend.controllers.itr_router import router as itr_router
 from backend.controllers.user_router import router as user_router
 from backend.db import DatabaseManager
+from backend.services.blob_service import BlobStorageService
 
 
 @asynccontextmanager
@@ -15,6 +17,7 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown: Close DB and cleanup
     await DatabaseManager.close()
+    await BlobStorageService.close()
 
 
 app = FastAPI(
@@ -37,9 +40,5 @@ app.add_middleware(
 # Route registration
 api_router.include_router(extraction_router)
 api_router.include_router(user_router)
+api_router.include_router(itr_router)
 app.include_router(api_router)
-
-
-@app.get("/api/v1/health")
-async def health_check():
-    return {"status": "ok"}

@@ -1,16 +1,36 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FileText, CheckCircle2, AlertCircle, RefreshCw, Loader2, ArrowRight } from 'lucide-react';
+import clsx from 'clsx';
 import { apiService } from '../services/api';
 
 const ProgressDashboardPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { sessionId } = location.state || {};
+    const { sessionId, files } = location.state || {};
 
     const [sessionState, setSessionState] = useState(null);
     const [connected, setConnected] = useState(false);
     const [error, setError] = useState(null);
+
+    // Placeholder documents from initial state until SSE takes over
+    const initialDocuments = useMemo(() => {
+        if (!files) return [];
+        const docs = [];
+        Object.entries(files).forEach(([type, fileList]) => {
+            fileList.forEach(file => {
+                docs.push({
+                    file_name: file.name,
+                    file_hash: file.name, // Temporary hash
+                    doc_type: type,
+                    completed_pages: 0,
+                    total_pages: 1,
+                    status: 'queued'
+                });
+            });
+        });
+        return docs;
+    }, [files]);
 
     useEffect(() => {
         if (!sessionId) {
@@ -36,9 +56,9 @@ const ProgressDashboardPage = () => {
     }, [sessionId, navigate]);
 
     const documents = useMemo(() => {
-        if (!sessionState?.documents) return [];
+        if (!sessionState?.documents) return initialDocuments;
         return Object.values(sessionState.documents);
-    }, [sessionState]);
+    }, [sessionState, initialDocuments]);
 
     const overallProgress = useMemo(() => {
         if (documents.length === 0) return 0;

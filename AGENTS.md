@@ -14,11 +14,12 @@
 | `.agents/skills/` | Auto-activated skills (fastapi-backend, react-frontend) |
 | `AGENTS.md` | This file — codebase map |
 | `openspec/` | OpenSpec change artifacts (proposals, designs, specs, tasks) |
+| `docs/` | Project documentation (e.g., architecture) |
 | `.env` | All project secrets are stored here. Don't change the values here unless explicitly asked by user |
 
 ## Backend (`backend/`)
 
-> **Status:** Migrated to Async MongoDB (`motor`).
+> **Status:** Migrated to Async MongoDB (`motor`). Extended with In-Memory ITR Processing & Azure Blob.
 
 | Path | Responsibility |
 |------|---------------|
@@ -28,6 +29,7 @@
 | `backend/db.py` | DB connection, table definitions, CRUD (while small) |
 | `backend/utils.py` | Shared helpers, compiled regex patterns |
 | `backend/controllers/` | `*_router.py` — route definitions only |
+| `backend/services/prompt_templates.py` | Doc-type specific Gemini prompts |
 | `backend/services/` | `*_service.py` — business logic, one file per task |
 | `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |
 | `backend/dal/` | `*_dal.py` — created only when `db.py` grows too large |
@@ -35,14 +37,15 @@
 
 ## Frontend (`frontend/`)
 
-> **Status:** Redesigned with Dark Premium Auth UI.
+> **Status:** Redesigned with Dark Premium Auth UI & Full ITR Journey.
 
 | Path | Responsibility |
 |------|---------------|
-| `frontend/src/App.jsx` | Root component, routing |
-| `frontend/src/pages/` | One component per page |
+| `frontend/src/App.jsx` | Root component, routing (react-router-dom) |
+| `frontend/src/pages/` | Auth, ITR Selection, Upload, Progress, Summary pages |
+| `frontend/src/components/upload/` | FileDropzone and upload-related components |
 | `frontend/src/components/shared/` | Reusable UI elements |
 | `frontend/src/components/<page>/` | Page-specific sub-components |
-| `frontend/src/services/` | Centralized API service functions |
+| `frontend/src/services/api.js` | API service with SSE support |
 | `frontend/src/hooks/` | Custom React hooks |
 | `frontend/src/styles/` | CSS files |

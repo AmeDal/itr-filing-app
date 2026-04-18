@@ -1,3 +1,19 @@
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Path to the test environment file
+test_env_path = Path(__file__).parent.parent.parent / ".env.test"
+
+# Force load the test environment variables, overriding ANY existing ones
+if test_env_path.exists():
+    load_dotenv(dotenv_path=test_env_path, override=True)
+else:
+    raise RuntimeError(f"FATAL: .env.test not found at {test_env_path}")
+
+# Prevent settings from looking at the wrong file
+os.environ["ENV_FILE"] = ".env.test"
+
 import pytest
 import asyncio
 from httpx import AsyncClient, ASGITransport
@@ -10,7 +26,7 @@ from backend.settings import get_settings
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for each test session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
+    loop = asyncio.new_event_loop()
     yield loop
     loop.close()
 
@@ -20,20 +36,22 @@ async def db_lifecycle(event_loop):
     Initializes the database for the test session and guarantees cleanup.
     Pointed to the ephemeral 'itr_filing_integration_test' database.
     """
+    # Force reload settings from the newly set ENV_FILE
+    get_settings.cache_clear()
     settings = get_settings()
-    
+
     # CRITICAL SECURITY CHECK: Ensure we are NOT wiping production
     if settings.mongo_db_name != "itr_filing_integration_test":
         raise RuntimeError(f"FATAL: Tests attempted to run against unexpected DB: {settings.mongo_db_name}")
 
     # Initialize connection
     await DatabaseManager.initialize()
-    
+
     yield
-    
+
     # CLEANUP PHASE: Destroy the ephemeral test database
     await DatabaseManager.close()
-    
+
     # Use sync client for total destruction (bypassing Motor lifecycle issues during shutdown)
     sync_client = MongoClient(settings.mongo_uri)
     try:
@@ -63,7 +81,7 @@ async def db_cleanup():
 async def async_client():
     """Returns an AsyncClient for testing the FastAPI application."""
     async with AsyncClient(
-        transport=ASGITransport(app=app), 
+        transport=ASGITransport(app=app),
         base_url="http://test"
     ) as client:
         yield client

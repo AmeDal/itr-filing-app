@@ -1,20 +1,48 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, FileText, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Calendar, FileText, ArrowRight, CheckCircle2, ChevronDown } from 'lucide-react';
 import clsx from 'clsx';
 
 const ITR_TYPES = [
-    { id: 'ITR-1', name: 'ITR-1 (Sahaj)', desc: 'For individuals having income from salaries, one house property, other sources (Interest etc.), and total income up to ₹50 lakh.', status: 'active' },
-    { id: 'ITR-2', name: 'ITR-2', desc: 'For Individuals and HUFs not having income from profits and gains of business or profession.', status: 'active' },
-    { id: 'ITR-3', name: 'ITR-3', desc: 'For individuals and HUFs having income from profits and gains of business or profession.', status: 'coming_soon' },
-    { id: 'ITR-4', name: 'ITR-4 (Sugam)', desc: 'For Individuals, HUFs and Firms (other than LLP) being a resident having total income up to ₹50 lakh.', status: 'not_supported' },
-    { id: 'ITR-5', name: 'ITR-5', desc: 'For persons other than- (i) individual, (ii) HUF, (iii) company and (iv) person filing Form ITR-7.', status: 'not_supported' },
+    { id: 'ITR-1', name: 'ITR-1 (Sahaj)', desc: 'Salaried individuals (income up to ₹50 lakh) with one house property and simple interest income. Not for those with capital gains or business income.', status: 'active' },
+    { id: 'ITR-2', name: 'ITR-2', desc: 'Individuals and HUFs with capital gains, multiple house properties, or foreign income, but no business or professional income.', status: 'active' },
+    { id: 'ITR-3', name: 'ITR-3', desc: 'Individuals and HUFs having income from business or profession.', status: 'coming_soon' },
+    { id: 'ITR-4', name: 'ITR-4 (Sugam)', desc: 'Individuals, HUFs, and firms (excluding LLPs) opting for presumptive taxation scheme, with income up to ₹50 lakh.', status: 'not_supported' },
+    { id: 'ITR-5', name: 'ITR-5', desc: 'Firms, LLPs, AOPs, BOIs, and other non-individual entities required to file returns.', status: 'not_supported' },
 ];
 
 const ITRSelectionPage = () => {
     const navigate = useNavigate();
-    const [ay, setAy] = useState('2024-25');
+    
+    // Dynamically calculate AY options based on current date
+    const ayOptions = useMemo(() => {
+        const today = new Date(); // Today is April 19, 2026 per context
+        const currentYear = today.getFullYear();
+        const currentMonth = today.getMonth() + 1;
+        
+        // India: AY starts on April 1. 
+        // Example: On April 19, 2026, we are in AY 2026-27
+        const latestAYStart = currentMonth >= 4 ? currentYear : currentYear - 1;
+        
+        return [
+            { 
+                value: `${latestAYStart}-${(latestAYStart + 1).toString().slice(-2)}`, 
+                label: `${latestAYStart}-${(latestAYStart + 1).toString().slice(-2)} (Latest)` 
+            },
+            { 
+                value: `${latestAYStart - 1}-${(latestAYStart).toString().slice(-2)}`, 
+                label: `${latestAYStart - 1}-${(latestAYStart).toString().slice(-2)}` 
+            },
+            { 
+                value: `${latestAYStart - 2}-${(latestAYStart - 1).toString().slice(-2)}`, 
+                label: `${latestAYStart - 2}-${(latestAYStart - 1).toString().slice(-2)}` 
+            },
+        ];
+    }, []);
+
+    const [ay, setAy] = useState(ayOptions[0].value);
     const [selectedType, setSelectedType] = useState('ITR-1');
+    const [showAYDropdown, setShowAYDropdown] = useState(false);
 
     const handleContinue = () => {
         if (!selectedType) return;
@@ -26,7 +54,7 @@ const ITRSelectionPage = () => {
             <div className="glass-card" style={{ maxWidth: '800px' }}>
                 <header style={{ marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
-                        <div style={{ background: 'var(--accent-primary)', p: '0.5rem', borderRadius: '8px', display: 'flex' }}>
+                        <div style={{ background: 'var(--accent-primary)', padding: '0.5rem', borderRadius: '8px', display: 'flex' }}>
                             <FileText size={20} color="white" />
                         </div>
                         <h1 style={{ margin: 0 }}>Start Your Filing</h1>
@@ -36,24 +64,49 @@ const ITRSelectionPage = () => {
                     </p>
                 </header>
 
-                <div className="select-wrapper">
+                <div className="select-wrapper" style={{ position: 'relative' }}>
                     <label className="input-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <Calendar size={14} /> Assessment Year (AY)
                     </label>
-                    <div style={{ position: 'relative' }}>
-                        <select 
-                            className="custom-select" 
-                            value={ay} 
-                            onChange={(e) => setAy(e.target.value)}
-                        >
-                            <option value="2025-26">2025-26 (Latest)</option>
-                            <option value="2024-25">2024-25</option>
-                            <option value="2023-24">2023-24</option>
-                        </select>
-                        <div style={{ position: 'absolute', right: '1.25rem', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-secondary)' }}>
-                            <ArrowRight size={18} style={{ transform: 'rotate(90deg)' }} />
-                        </div>
+                    
+                    <div 
+                        className="custom-select" 
+                        onClick={() => setShowAYDropdown(!showAYDropdown)}
+                        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                        <span>{ayOptions.find(o => o.value === ay)?.label}</span>
+                        <ChevronDown 
+                            size={20} 
+                            style={{ 
+                                transition: 'transform 0.3s ease',
+                                transform: showAYDropdown ? 'rotate(180deg)' : 'rotate(0)'
+                            }} 
+                        />
                     </div>
+
+                    {showAYDropdown && (
+                        <>
+                            <div 
+                                style={{ position: 'fixed', inset: 0, zIndex: 10 }} 
+                                onClick={() => setShowAYDropdown(false)} 
+                            />
+                            <div className="dropdown-options">
+                                {ayOptions.map(option => (
+                                    <div 
+                                        key={option.value}
+                                        className={clsx('dropdown-item', ay === option.value && 'selected')}
+                                        onClick={() => {
+                                            setAy(option.value);
+                                            setShowAYDropdown(false);
+                                        }}
+                                    >
+                                        {option.label}
+                                        {ay === option.value && <CheckCircle2 size={14} color="var(--accent-primary)" />}
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 <div style={{ marginBottom: '1rem' }}>
