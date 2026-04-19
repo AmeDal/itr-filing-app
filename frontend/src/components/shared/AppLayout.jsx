@@ -23,8 +23,8 @@ const AppLayout = () => {
           </Link>
 
           <nav className="nav">
-            <Link to="/itr-select" className={`nav-link ${location.pathname === '/itr-select' ? 'active' : ''}`}>Dashboard</Link>
-            <Link to="/upload" className={`nav-link ${location.pathname === '/upload' ? 'active' : ''}`}>Upload</Link>
+            <Link to="/itr-select" className={`nav-link ${location.pathname === '/itr-select' ? 'active' : ''}`}>New Filing</Link>
+            <Link to="/filing-history" className={`nav-link ${location.pathname === '/filing-history' ? 'active' : ''}`}>History</Link>
           </nav>
 
           <UserMenu />

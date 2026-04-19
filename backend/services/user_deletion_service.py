@@ -26,11 +26,10 @@ async def hard_delete_user(user_id: str):
     # Also support string match if ObjectId conversion succeeded but we want to be safe
     # However, usually it's one or the other.
 
-    # 1. Delete Extraction Records
-    # Using both str and OID for safety in foreign keys
-    await db.documents.delete_many({"created_by_user_id": user_id})
-    doc_res = await db.documents.delete_many({"created_by_user_id": user_oid})
-    logger.info(f"Deleted extraction records for user {user_id}")
+    # 1. Delete Filing Records
+    # Filing attempts use user_id field
+    filing_res = await db.filing_attempts.delete_many({"user_id": user_oid})
+    logger.info(f"Deleted {filing_res.deleted_count} filing attempts for user {user_id}")
 
     # 2. Delete Blobs
     await BlobStorageService.delete_user_blobs(user_id)
@@ -46,7 +45,7 @@ async def hard_delete_user(user_id: str):
 
     return {
         "user_id": user_id,
-        "extraction_records_deleted": doc_res.deleted_count,
+        "filing_attempts_deleted": filing_res.deleted_count,
         "profile_deleted": user_res.deleted_count > 0
     }
 

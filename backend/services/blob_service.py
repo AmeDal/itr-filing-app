@@ -54,7 +54,8 @@ class BlobStorageService:
         Path: {user_id}/{ay}/{doc_type}/{file_hash}/page_{page_index}.json
         """
         settings = get_settings()
-        blob_name = f"{user_id}/AY-{ay}/{doc_type}/{file_hash}/page_{page_index}.json"
+        # ay is expected to be in format "AY-YYYY-YY"
+        blob_name = f"{user_id}/{ay}/{doc_type}/{file_hash}/page_{page_index}.json"
 
         client = cls.get_client()
         # Ensure container exists before first upload
@@ -76,7 +77,7 @@ class BlobStorageService:
         Checks if all pages for a document have already been extracted.
         """
         settings = get_settings()
-        prefix = f"{user_id}/AY-{ay}/{doc_type}/{file_hash}/"
+        prefix = f"{user_id}/{ay}/{doc_type}/{file_hash}/"
 
         client = cls.get_client()
         try:
@@ -109,7 +110,7 @@ class BlobStorageService:
         Retrieves all page JSONs for a specific document.
         """
         settings = get_settings()
-        prefix = f"{user_id}/AY-{ay}/{doc_type}/{file_hash}/page_"
+        prefix = f"{user_id}/{ay}/{doc_type}/{file_hash}/page_"
 
         client = cls.get_client()
         results = []
@@ -164,6 +165,72 @@ class BlobStorageService:
         except Exception as e:
             logger.error(f"Error deleting user blobs: {e}")
             raise e
+
+    @classmethod
+    async def get_existing_hash_for_slot(cls, user_id: str, ay: str, doc_type: str) -> Optional[str]:
+        """
+        Returns the file hash used in the existing blob path for this document slot, if any.
+        Path structure: {user_id}/{ay}/{doc_type}/{hash}/...
+        """
+        settings = get_settings()
+        prefix = f"{user_id}/{ay}/{doc_type}/"
+        client = cls.get_client()
+        
+        try:
+            container_client = client.get_container_client(settings.azure_storage_container_name)
+            async for blob in container_client.list_blobs(name_starts_with=prefix):
+                # path is user_id/ay/doc_type/HASH/page_N.json
+                parts = blob.name.split("/")
+                if len(parts) >= 4:
+                    return parts[3]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting existing hash for slot: {e}")
+            return None
+
+    @classmethod
+    async def delete_doc_blobs(cls, user_id: str, ay: str, doc_type: str):
+        """
+        Deletes all blobs for a specific document slot (all hashes).
+        """
+        settings = get_settings()
+        prefix = f"{user_id}/{ay}/{doc_type}/"
+        client = cls.get_client()
+        
+        try:
+            container_client = client.get_container_client(settings.azure_storage_container_name)
+            async for blob in container_client.list_blobs(name_starts_with=prefix):
+                logger.info(f"Deleting blob for slot recovery: {blob.name}")
+                await container_client.delete_blob(blob.name)
+        except ResourceNotFoundError:
+            pass
+        except Exception as e:
+            logger.error(f"Error deleting doc blobs: {e}")
+
+    @classmethod
+    async def list_existing_pages(cls, user_id: str, ay: str, doc_type: str, file_hash: str) -> List[int]:
+        """
+        Returns a list of page indices that are already extracted for this hash.
+        """
+        settings = get_settings()
+        prefix = f"{user_id}/{ay}/{doc_type}/{file_hash}/page_"
+        client = cls.get_client()
+        indices = []
+        
+        try:
+            container_client = client.get_container_client(settings.azure_storage_container_name)
+            async for blob in container_client.list_blobs(name_starts_with=prefix):
+                try:
+                    idx = int(blob.name.split("page_")[-1].split(".json")[0])
+                    indices.append(idx)
+                except Exception:
+                    continue
+            return indices
+        except ResourceNotFoundError:
+            return []
+        except Exception as e:
+            logger.error(f"Error listing existing pages: {e}")
+            return []
 
     @classmethod
     async def close(cls):

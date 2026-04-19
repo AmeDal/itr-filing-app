@@ -72,7 +72,7 @@ async def db_cleanup():
     """
     db = DatabaseManager.get_db()
     # We don't drop the vault collections! Just the data.
-    collections_to_clear = ["users", "documents", "batches"]
+    collections_to_clear = ["users", "filing_attempts"]
     for coll_name in collections_to_clear:
         if coll_name in await db.list_collection_names():
             await db[coll_name].delete_many({})

@@ -11,6 +11,9 @@ from backend.logger import logger
 from backend.services.blob_service import BlobStorageService
 from backend.services.llm_service import _generate_content_with_retry, get_client
 from backend.services.prompt_templates import get_prompt_for_doc_type
+from backend.services import filing_service
+from backend.schemas.filing_schema import FilingDocumentSchema
+from backend.constants import DocumentType
 from backend.settings import get_settings
 
 
@@ -61,6 +64,15 @@ class SessionManager:
 
                 if doc["completed_pages"] == total_pages:
                     doc["status"] = "completed"
+
+                # Persist to DB if completed
+                if doc["status"] == "completed" or (total_pages > 0 and doc["completed_pages"] == total_pages):
+                    asyncio.create_task(filing_service.update_extraction_status(
+                        cls._sessions[session_id]["owner_user_id"],
+                        cls._sessions[session_id].get("assessment_year", ""),
+                        doc.get("type", ""),
+                        True
+                    ))
 
                 cls.broadcast(session_id)
 
@@ -116,42 +128,65 @@ class ITRProcessingService:
                                file_bytes: bytes,
                                force_reparse: bool = False):
         file_hash = cls.calculate_file_hash(file_bytes)
+        
+        # Ensure assessment_year is in SessionManager for DB updates
+        if session_id in SessionManager._sessions:
+            SessionManager._sessions[session_id]["assessment_year"] = ay
 
-        # 1. Convert PDF to images in-memory
-        try:
-            doc = fitz.open(stream=file_bytes, filetype="pdf")
-            total_pages = len(doc)
-        except Exception as e:
-            logger.error(f"Failed to open PDF {file_name}: {e}")
-            SessionManager.update_progress(session_id,
-                                           file_hash,
-                                           0,
-                                           1,
-                                           status="error")
+        # 0. Handle TRADING_REPORT (Metadata only, no extraction)
+        if doc_type == DocumentType.TRADING_REPORT:
+            logger.info(f"Skipping extraction for {doc_type} - marked as complete (metadata only).")
+            await filing_service.add_or_update_document(
+                user_id, ay, 
+                FilingDocumentSchema(name=file_name, type=doc_type, is_extraction_complete=True, total_pages=0)
+            )
+            SessionManager.update_progress(session_id, file_hash, 0, 0, status="completed")
             return
 
-        # 2. Check Cache (Blob Storage)
-        if not force_reparse:
-            is_complete = await BlobStorageService.check_extraction_complete(
-                user_id, ay, doc_type, file_hash, total_pages)
-            if is_complete:
-                SessionManager.update_progress(session_id,
-                                               file_hash,
-                                               total_pages,
-                                               total_pages,
-                                               status="completed")
-                return
+        # 1. Recovery Check: Hash comparison
+        existing_hash = await BlobStorageService.get_existing_hash_for_slot(user_id, ay, doc_type)
+        if existing_hash and existing_hash != file_hash:
+            logger.info(f"File hash changed for {doc_type} ({existing_hash} -> {file_hash}). Wiping old blobs.")
+            await BlobStorageService.delete_doc_blobs(user_id, ay, doc_type)
+            # We don't return here, we progress as a fresh upload
 
-        SessionManager.update_progress(session_id,
-                                       file_hash,
-                                       0,
-                                       total_pages,
-                                       status="extracting")
+        # 2. Convert PDF to images in-memory
+        try:
+            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
+            total_pages = len(pdf_doc)
+        except Exception as e:
+            logger.error(f"Failed to open PDF {file_name}: {e}")
+            SessionManager.update_progress(session_id, file_hash, 0, 1, status="error")
+            return
 
-        # 3. Process Pages in Batches
+        # 3. Update DB with initial document state
+        await filing_service.add_or_update_document(
+            user_id, ay, 
+            FilingDocumentSchema(name=file_name, type=doc_type, is_extraction_complete=False, total_pages=total_pages)
+        )
+
+        # 4. Filter missing pages (Recovery)
+        existing_pages = await BlobStorageService.list_existing_pages(user_id, ay, doc_type, file_hash)
+        pages_to_process = [i for i in range(total_pages) if i not in existing_pages]
+        
+        # Update session with existing progress
+        doc_info = SessionManager._sessions.get(session_id, {}).get("documents", {}).get(file_hash)
+        if doc_info:
+            doc_info["completed_pages"] = len(existing_pages)
+            doc_info["type"] = doc_type # Ensure type is available for DB update task
+
+        if not pages_to_process:
+            logger.info(f"All {total_pages} pages for {doc_type} already extracted. Skipping.")
+            SessionManager.update_progress(session_id, file_hash, total_pages, total_pages, status="completed")
+            pdf_doc.close()
+            return
+
+        SessionManager.update_progress(session_id, file_hash, len(existing_pages), total_pages, status="extracting")
+
+        # 5. Process remaining pages
         tasks = []
-        for i in range(total_pages):
-            page = doc[i]
+        for i in pages_to_process:
+            page = pdf_doc[i]
             pix = page.get_pixmap(dpi=200)
             img_bytes = pix.tobytes("png")
             tasks.append(
@@ -159,7 +194,7 @@ class ITRProcessingService:
                                          file_hash, i, total_pages, img_bytes))
 
         await asyncio.gather(*tasks)
-        doc.close()
+        pdf_doc.close()
 
     @classmethod
     async def _process_single_page(cls, session_id: str, user_id: str, ay: str,

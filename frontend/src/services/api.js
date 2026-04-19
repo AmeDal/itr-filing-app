@@ -129,5 +129,25 @@ export const apiService = {
     });
     if (!response.ok) throw new Error('Password reset failed');
     return response.json();
+  },
+
+  async getFilingHistory() {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history`);
+    if (!response.ok) throw new Error('Failed to fetch filing history');
+    return response.json();
+  },
+
+  async getFilingDetail(ay) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history/${ay}`);
+    if (!response.ok) throw new Error('Failed to fetch filing details');
+    return response.json();
+  },
+
+  async deleteDocument(ay, docType) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history/${ay}/${docType}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Failed to delete document');
+    return response.json();
   }
 };

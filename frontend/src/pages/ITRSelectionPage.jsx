@@ -26,15 +26,15 @@ const ITRSelectionPage = () => {
         
         return [
             { 
-                value: `${latestAYStart}-${(latestAYStart + 1).toString().slice(-2)}`, 
+                value: `AY-${latestAYStart}-${(latestAYStart + 1).toString().slice(-2)}`, 
                 label: `${latestAYStart}-${(latestAYStart + 1).toString().slice(-2)} (Latest)` 
             },
             { 
-                value: `${latestAYStart - 1}-${(latestAYStart).toString().slice(-2)}`, 
+                value: `AY-${latestAYStart - 1}-${(latestAYStart).toString().slice(-2)}`, 
                 label: `${latestAYStart - 1}-${(latestAYStart).toString().slice(-2)}` 
             },
             { 
-                value: `${latestAYStart - 2}-${(latestAYStart - 1).toString().slice(-2)}`, 
+                value: `AY-${latestAYStart - 2}-${(latestAYStart - 1).toString().slice(-2)}`, 
                 label: `${latestAYStart - 2}-${(latestAYStart - 1).toString().slice(-2)}` 
             },
         ];

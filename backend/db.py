@@ -90,8 +90,7 @@ class DatabaseManager:
         """Ensures required indexes exist."""
         await cls.db.users.create_index("pan_number", unique=True)
         await cls.db.users.create_index("email", unique=True, sparse=True)
-        await cls.db.documents.create_index("id", unique=True)
-        await cls.db.documents.create_index("batch_id")
+        await cls.db.filing_attempts.create_index([("user_id", 1), ("assessment_year", 1)], unique=True)
 
     @classmethod
     async def _seed_admin_user(cls):

@@ -16,6 +16,7 @@ import ITRSelectionPage from './pages/ITRSelectionPage';
 import DocumentUploadPage from './pages/DocumentUploadPage';
 import ProgressDashboardPage from './pages/ProgressDashboardPage';
 import SummaryPage from './pages/SummaryPage';
+import FilingHistoryPage from './pages/FilingHistoryPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 
 const ApiAuthBridge = () => {
@@ -43,6 +44,7 @@ function App() {
                 <Route path="/upload" element={<DocumentUploadPage />} />
                 <Route path="/progress" element={<ProgressDashboardPage />} />
                 <Route path="/summary" element={<SummaryPage />} />
+                <Route path="/filing-history" element={<FilingHistoryPage />} />
                 
                 <Route element={<ProtectedRoute requireAdmin={true} />}>
                   <Route path="/admin/users" element={<AdminUsersPage />} />

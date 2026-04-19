@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react'
 import FileDropzone from '../components/upload/FileDropzone';
 import { apiService } from '../services/api';
 
+import { DocumentType } from '../constants/docTypes';
+
 const DocumentUploadPage = () => {
     const location = useLocation();
     const navigate = useNavigate();
@@ -15,13 +17,13 @@ const DocumentUploadPage = () => {
     }, [ay, navigate]);
 
     const [files, setFiles] = useState({
-        FORM_26AS: [],
-        AIS: [],
-        TIS: [],
-        BANK_STATEMENT: [],
-        ZERODHA_PL: [],
-        FORM_16: [],
-        OTHER: []
+        [DocumentType.AS26]: [],
+        [DocumentType.AIS]: [],
+        [DocumentType.TIS]: [],
+        [DocumentType.BANK_STATEMENT]: [],
+        [DocumentType.TRADING_REPORT]: [],
+        [DocumentType.FORM_16]: [],
+        [DocumentType.OTHER]: []
     });
 
     const [showWarning, setShowWarning] = useState(false);
@@ -29,7 +31,7 @@ const DocumentUploadPage = () => {
     const [error, setError] = useState(null);
 
     const onFilesAdded = (id, newFiles) => {
-        const isMultiple = ['BANK_STATEMENT', 'ZERODHA_PL', 'OTHER'].includes(id);
+        const isMultiple = [DocumentType.BANK_STATEMENT, DocumentType.TRADING_REPORT, DocumentType.OTHER].includes(id);
         setFiles(prev => ({
             ...prev,
             [id]: isMultiple ? [...prev[id], ...newFiles] : newFiles
@@ -43,16 +45,16 @@ const DocumentUploadPage = () => {
         }));
     };
 
-    const isAllRequiredPresent = files.FORM_26AS.length > 0 && 
-                                files.AIS.length > 0 && 
-                                files.TIS.length > 0 && 
-                                files.BANK_STATEMENT.length > 0;
+    const isAllRequiredPresent = files[DocumentType.AS26].length > 0 && 
+                                 files[DocumentType.AIS].length > 0 && 
+                                 files[DocumentType.TIS].length > 0 && 
+                                 files[DocumentType.BANK_STATEMENT].length > 0;
 
     const handleSubmit = async (force = false) => {
         if (!isAllRequiredPresent) return;
 
         // Form 16 Warning logic
-        if (files.FORM_16.length === 0 && !force) {
+        if (files[DocumentType.FORM_16].length === 0 && !force) {
             setShowWarning(true);
             return;
         }
@@ -63,11 +65,12 @@ const DocumentUploadPage = () => {
         try {
             // Prepare FormData
             const formData = new FormData();
-            formData.append('ay', ay);
-            formData.append('itr_type', itrType);
+            // Ensure AY format for backend AY-YYYY-YY (now robustly handled)
+            const ayCleaned = ay.replace(/\s+/g, '');
+            const ayFormatted = ayCleaned.startsWith('AY-') ? ayCleaned : `AY-${ayCleaned}`;
             
-            // TODO: Replace with real user_oid from state/context later
-            formData.append('user_id', 'user_123_temp');
+            formData.append('ay', ayFormatted);
+            formData.append('itr_type', itrType);
 
             const docTypes = [];
             
@@ -105,42 +108,43 @@ const DocumentUploadPage = () => {
 
                 <div style={{ height: '500px', overflowY: 'auto', paddingRight: '1rem', marginBottom: '2rem' }}>
                     <FileDropzone 
-                        id="FORM_26AS" label="Form 26AS" required
+                        id={DocumentType.AS26} label="Form 26AS" required
                         description="Tax Credit Statement from Income Tax Dept."
-                        files={files.FORM_26AS} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.AS26]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                     <FileDropzone 
-                        id="AIS" label="AIS" required
+                        id={DocumentType.AIS} label="AIS" required
                         description="Annual Information Statement."
-                        files={files.AIS} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.AIS]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                     <FileDropzone 
-                        id="TIS" label="TIS" required
+                        id={DocumentType.TIS} label="TIS" required
                         description="Taxpayer Information Summary."
-                        files={files.TIS} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.TIS]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                     <FileDropzone 
-                        id="BANK_STATEMENT" label="Bank Statements" required multiple
+                        id={DocumentType.BANK_STATEMENT} label="Bank Statements" required multiple
                         description="PDF format only."
-                        files={files.BANK_STATEMENT} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.BANK_STATEMENT]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                         notice="Please add ALL statements for ALL active bank accounts."
                     />
                     <FileDropzone 
-                        id="ZERODHA_PL" label="Zerodha Tax P&L" multiple accept=".xls,.xlsx"
-                        description="Excel files exported from Zerodha Console (Optional)."
-                        files={files.ZERODHA_PL} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        id={DocumentType.TRADING_REPORT} label="Trading Report (Tax P&L)" multiple accept=".xls,.xlsx,.pdf"
+                        description="Excel or PDF exported from Broker (Optional)."
+                        files={files[DocumentType.TRADING_REPORT]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                     <FileDropzone 
-                        id="FORM_16" label="Form 16"
+                        id={DocumentType.FORM_16} label="Form 16"
                         description="Salary Certificate from your employer (Optional)."
-                        files={files.FORM_16} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.FORM_16]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                     <FileDropzone 
-                        id="OTHER" label="Other Documents" multiple accept=".pdf,.xls,.xlsx"
+                        id={DocumentType.OTHER} label="Other Documents" multiple accept=".pdf,.xls,.xlsx"
                         description="Investment proofs, Rent receipts, etc (Optional)."
-                        files={files.OTHER} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
+                        files={files[DocumentType.OTHER]} onFilesAdded={onFilesAdded} onFileRemoved={onFileRemoved}
                     />
                 </div>
+
 
                 {error && (
                     <div className="error-text" style={{ padding: '1rem', background: 'rgba(244, 63, 94, 0.1)', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
