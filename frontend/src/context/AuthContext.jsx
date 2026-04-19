@@ -7,6 +7,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [accessToken, setAccessToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  });
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const login = async (pan, password) => {
     const formData = new URLSearchParams();
@@ -93,7 +106,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     refreshAccessToken,
-    isLoading
+    isLoading,
+    theme,
+    toggleTheme
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

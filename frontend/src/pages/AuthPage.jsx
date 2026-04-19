@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LogIn, UserPlus, ArrowRight, ShieldCheck, Mail, Phone, Lock, Hash, MapPin, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/shared/ThemeToggle';
 
 const AuthPage = () => {
     const navigate = useNavigate();
@@ -121,11 +122,14 @@ const AuthPage = () => {
 
     return (
         <div className="auth-container">
+            <div style={{ position: 'absolute', top: '2rem', right: '2rem' }}>
+                <ThemeToggle />
+            </div>
             <div className="glass-card">
-                <header style={{ marginBottom: '2.5rem' }}>
-                    <h1>{isLogin ? 'Welcome Back' : 'Join ITR Filing'}</h1>
-                    <p className="subtitle">
-                        {isLogin ? 'Enter your credentials to access your portal.' : 'Create your tax filing account in seconds.'}
+                <header style={{ marginBottom: '3.5rem' }}>
+                    <h1 style={{ marginBottom: '1rem' }}>{isLogin ? 'Sign In' : 'Create Account'}</h1>
+                    <p className="subtitle" style={{ fontSize: '1rem', lineHeight: '1.6' }}>
+                        {isLogin ? 'Secure access to your professional tax filing dashboard.' : 'Initialize your professional-grade tax filing profile.'}
                     </p>
                 </header>
 
@@ -152,8 +156,8 @@ const AuthPage = () => {
                     <div className="input-group">
                         <label className="input-label">PAN Number</label>
                         <div style={{ position: 'relative' }}>
-                            <Hash size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                            <input type="text" name="pan_number" className="input-field" style={{ paddingLeft: '3rem', borderColor: form.pan_number && !validations.pan ? 'var(--error)' : '' }} placeholder="ABCDE1234F" required value={form.pan_number} onChange={handleChange} maxLength={10} />
+                            <Hash size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                            <input type="text" name="pan_number" className="input-field tabular-nums" style={{ paddingLeft: '3rem', borderColor: form.pan_number && !validations.pan ? 'var(--error)' : '' }} placeholder="ABCDE1234F" required value={form.pan_number} onChange={handleChange} maxLength={10} />
                         </div>
                         {form.pan_number && !validations.pan && <span className="error-text">Invalid PAN format</span>}
                     </div>
@@ -163,15 +167,15 @@ const AuthPage = () => {
                             <div className="input-group">
                                 <label className="input-label">Aadhar Number</label>
                                 <div style={{ position: 'relative' }}>
-                                    <ShieldCheck size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                                    <input type="text" name="aadhar_number" className="input-field" style={{ paddingLeft: '3rem', borderColor: form.aadhar_number && !validations.aadhar ? 'var(--error)' : '' }} placeholder="1234 5678 9012" required value={form.aadhar_number} onChange={handleChange} maxLength={14} />
+                                    <ShieldCheck size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input type="text" name="aadhar_number" className="input-field tabular-nums" style={{ paddingLeft: '3rem', borderColor: form.aadhar_number && !validations.aadhar ? 'var(--error)' : '' }} placeholder="1234 5678 9012" required value={form.aadhar_number} onChange={handleChange} maxLength={14} />
                                 </div>
                                 {form.aadhar_number && !validations.aadhar && <span className="error-text">Invalid Aadhar</span>}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="input-group">
                                     <label className="input-label">Pincode</label>
-                                    <input type="text" name="aadhar_pincode" className="input-field" style={{ borderColor: form.aadhar_pincode && !validations.pincode ? 'var(--error)' : '' }} placeholder="400001" required value={form.aadhar_pincode} onChange={handleChange} maxLength={6} />
+                                    <input type="text" name="aadhar_pincode" className="input-field tabular-nums" style={{ borderColor: form.aadhar_pincode && !validations.pincode ? 'var(--error)' : '' }} placeholder="400001" required value={form.aadhar_pincode} onChange={handleChange} maxLength={6} />
                                     {form.aadhar_pincode && !validations.pincode && <span className="error-text">6 digits</span>}
                                 </div>
                                 <div className="input-group">
@@ -184,8 +188,8 @@ const AuthPage = () => {
                             <div className="input-group">
                                 <label className="input-label">Mobile Number</label>
                                 <div style={{ position: 'relative' }}>
-                                    <Phone size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                                    <input type="text" name="mobile_number" className="input-field" style={{ paddingLeft: '3rem', borderColor: form.mobile_number && !validations.mobile ? 'var(--error)' : '' }} placeholder="9876543210" required value={form.mobile_number} onChange={handleChange} maxLength={10} />
+                                    <Phone size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                                    <input type="text" name="mobile_number" className="input-field tabular-nums" style={{ paddingLeft: '3rem', borderColor: form.mobile_number && !validations.mobile ? 'var(--error)' : '' }} placeholder="9876543210" required value={form.mobile_number} onChange={handleChange} maxLength={10} />
                                 </div>
                                 {form.mobile_number && !validations.mobile && <span className="error-text">10 digits</span>}
                             </div>
@@ -232,13 +236,13 @@ const AuthPage = () => {
                     </div>
 
                     {error && (
-                        <div className="error-text" style={{ marginBottom: '1.5rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', background: 'rgba(244, 63, 94, 0.1)', padding: '0.75rem', borderRadius: '10px' }}>
-                            <AlertCircle size={16} /> {error}
+                        <div className="error-text" style={{ marginBottom: '2rem', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--error)', background: 'var(--accent-soft)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--error)', fontSize: '0.875rem' }}>
+                            <AlertCircle size={18} /> {error}
                         </div>
                     )}
 
                     {success && !isLogin && (
-                         <div className="success-text" style={{ marginBottom: '1.5rem', textAlign: 'center', color: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '10px' }}>
+                         <div className="success-text" style={{ marginBottom: '2rem', textAlign: 'left', color: 'var(--success)', background: 'var(--accent-soft)', padding: '1rem', borderRadius: '8px', border: '1px solid var(--success)', fontSize: '0.875rem' }}>
                             {success}
                          </div>
                     )}

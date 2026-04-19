@@ -81,7 +81,7 @@ const ProgressDashboardPage = () => {
 
     return (
         <div className="auth-container">
-            <div className="glass-card" style={{ maxWidth: '800px' }}>
+            <div className="glass-card" style={{ maxWidth: '1000px' }}>
                 <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
@@ -114,8 +114,8 @@ const ProgressDashboardPage = () => {
                             <div key={doc.file_hash || doc.file_name} className="progress-item">
                                 <div className="progress-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', display: 'flex' }}>
-                                            <FileText size={18} color="var(--text-secondary)" />
+                                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'var(--surface-overlay)', display: 'flex' }}>
+                                            <FileText size={18} color="var(--text-muted)" />
                                         </div>
                                         <div>
                                             <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{doc.file_name}</h4>
@@ -124,7 +124,7 @@ const ProgressDashboardPage = () => {
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
                                         {isComplete ? (
-                                            <span className="badge badge-blue" style={{ background: 'rgba(16, 185, 129, 0.15)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                            <span className="badge" style={{ background: 'var(--accent-soft)', color: 'var(--success)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                                 <CheckCircle2 size={12} /> Completed
                                             </span>
                                         ) : isError ? (
@@ -132,7 +132,7 @@ const ProgressDashboardPage = () => {
                                                 <RefreshCw size={12} /> Retry
                                             </button>
                                         ) : (
-                                            <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>{doc.completed_pages} of {doc.total_pages} pages</span>
+                                            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)' }}>{doc.completed_pages} of {doc.total_pages} pages</span>
                                         )}
                                     </div>
                                 </div>

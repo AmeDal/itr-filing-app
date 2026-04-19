@@ -1,4 +1,4 @@
-## Capability: Upload Flow
+## MODIFIED Requirements
 
 ### Requirement: Sequential Stepped Upload
 The UI must enforce a specific sequence for document collection, ensuring users don't skip required documents (26AS, AIS, TIS, Bank Statements) without explicit confirmation where allowed. The UI SHALL maintain high contrast and readability in both `light` and `dark` themes.
@@ -7,13 +7,6 @@ The UI must enforce a specific sequence for document collection, ensuring users 
 - **WHEN** a user attempts to proceed without uploading Form 26AS.
 - **THEN** the "Continue" button remains disabled and an indicator highlights the missing requirement.
 - **AND** the error states and disabled buttons SHALL remain clearly distinguishable in both themes.
-
-### Requirement: Form 16 Warning
-A secondary validation check must occur if Form 16 is omitted, as it is critical for accurate filing.
-
-#### Scenario: Form 16 Omission
-- **WHEN** the user proceeds without a Form 16.
-- **THEN** an unmissable modal warning is displayed, requiring a "Confirm and Proceed" action.
 
 ### Requirement: Live Feedback
 The progress dashboard must update in real-time as pages are processed, without requiring a page refresh. The progress visuals SHALL be theme-aware.

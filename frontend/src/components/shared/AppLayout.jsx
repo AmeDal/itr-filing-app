@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import UserMenu from './UserMenu';
+import ThemeToggle from './ThemeToggle';
 import { ShieldCheck } from 'lucide-react';
 
 const AppLayout = () => {
@@ -23,11 +24,14 @@ const AppLayout = () => {
           </Link>
 
           <nav className="nav">
-            <Link to="/itr-select" className={`nav-link ${location.pathname === '/itr-select' ? 'active' : ''}`}>New Filing</Link>
-            <Link to="/filing-history" className={`nav-link ${location.pathname === '/filing-history' ? 'active' : ''}`}>History</Link>
+            <Link to="/itr-select" className={`nav-link ${location.pathname === '/itr-select' ? 'active' : ''}`}>Dashboard</Link>
+            <Link to="/upload" className={`nav-link ${location.pathname === '/upload' ? 'active' : ''}`}>Upload</Link>
           </nav>
 
-          <UserMenu />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <ThemeToggle />
+            <UserMenu />
+          </div>
         </div>
       </header>
 

@@ -95,7 +95,7 @@ const DocumentUploadPage = () => {
 
     return (
         <div className="auth-container">
-            <div className="glass-card" style={{ maxWidth: '800px' }}>
+            <div className="glass-card" style={{ maxWidth: '1000px' }}>
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2.5rem' }}>
                     <div>
                         <button className="auth-toggle" onClick={() => navigate(-1)} style={{ background: 'none', border: 'none', padding: 0, marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -147,7 +147,7 @@ const DocumentUploadPage = () => {
 
 
                 {error && (
-                    <div className="error-text" style={{ padding: '1rem', background: 'rgba(244, 63, 94, 0.1)', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="error-text" style={{ padding: '1rem', background: 'var(--surface-overlay)', border: '1px solid var(--error)', borderRadius: '12px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <AlertTriangle size={18} /> {error}
                     </div>
                 )}
@@ -176,10 +176,10 @@ const DocumentUploadPage = () => {
                                 <AlertTriangle size={32} color="#f59e0b" />
                             </div>
                             <h2>Form 16 Missing</h2>
-                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '2rem', lineHeight: 1.5 }}>
+                            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '2rem', lineHeight: 1.5 }}>
                                 If Form 16 is applicable but currently unavailable, you can upload it later. 
                                 <br/><br/>
-                                <strong style={{ color: 'var(--text-primary)' }}>Note: Processing will be incomplete without it.</strong>
+                                <strong style={{ color: 'var(--text-main)' }}>Note: Processing will be incomplete without it.</strong>
                             </p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 <button className="btn btn-primary" onClick={() => handleSubmit(true)}>Confirm and Proceed</button>

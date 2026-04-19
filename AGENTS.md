@@ -57,7 +57,7 @@
 | `frontend/src/App.jsx` | Root component, routing (react-router-dom), AuthProvider wrapper |
 | `frontend/src/pages/` | Auth, ITR Selection, Upload, Progress, Summary, AdminUsers pages |
 | `frontend/src/components/upload/` | FileDropzone and upload-related components |
-| `frontend/src/components/shared/` | Reusable UI elements (ProtectedRoute, UserMenu, AppLayout) |
+| `frontend/src/components/shared/` | Reusable UI elements (ProtectedRoute, UserMenu, AppLayout, ThemeToggle) |
 | `frontend/src/components/<page>/` | Page-specific sub-components |
 | `frontend/src/context/` | React Context providers (AuthContext) |
 | `frontend/src/services/api.js` | API service with SSE support, Bearer auth, refresh interceptor |
