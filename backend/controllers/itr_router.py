@@ -1,11 +1,13 @@
 import logging
 import uuid
+import json
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException, Depends
 from sse_starlette.sse import EventSourceResponse
 
 from backend.services.itr_processing_service import ITRProcessingService, SessionManager
+from backend.auth_deps import get_current_user, UserPrincipal
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/itr", tags=["ITR Processing"])
@@ -14,16 +16,16 @@ router = APIRouter(prefix="/v1/itr", tags=["ITR Processing"])
 @router.post("/upload")
 async def upload_documents(
     background_tasks: BackgroundTasks,
-    user_id: str = Form(...), # TODO: Extract from Auth Token later
     ay: str = Form(...),
     itr_type: str = Form(...),
     doc_types: str = Form(...), # JSON list e.g. ["FORM_26AS", "AIS", ...]
     files: List[UploadFile] = File(...),
+    current_user: UserPrincipal = Depends(get_current_user)
 ):
     """
     Accepts multiple ITR documents and starts in-memory processing.
+    User identity is derived from Auth token.
     """
-    import json
     try:
         dt_list = json.loads(doc_types)
     except Exception:
@@ -58,24 +60,28 @@ async def upload_documents(
             "hash": file_hash
         })
 
-    SessionManager.create_session(session_id, doc_metadata)
+    SessionManager.create_session(session_id, current_user.id, doc_metadata)
     
     # Start background tasks
     for pf in processed_files:
         background_tasks.add_task(
             ITRProcessingService.process_document,
-            session_id, user_id, ay, pf["type"], pf["name"], pf["bytes"]
+            session_id, current_user.id, ay, pf["type"], pf["name"], pf["bytes"]
         )
 
     return {"session_id": session_id, "message": "Upload successful. Processing started."}
 
 
 @router.get("/progress/{session_id}")
-async def get_progress_stream(session_id: str):
+async def get_progress_stream(
+    session_id: str,
+    current_user: UserPrincipal = Depends(get_current_user)
+):
     """
     SSE endpoint to track processing progress.
+    Scoped to the authenticated session owner.
     """
-    return EventSourceResponse(SessionManager.subscribe(session_id))
+    return EventSourceResponse(SessionManager.subscribe(session_id, current_user.id))
 
 
 @router.post("/retry/{session_id}/{file_hash}")
@@ -83,13 +89,12 @@ async def retry_extraction(
     session_id: str,
     file_hash: str,
     background_tasks: BackgroundTasks,
-    user_id: str = Form(...),
     ay: str = Form(...),
     doc_type: str = Form(...),
+    current_user: UserPrincipal = Depends(get_current_user)
 ):
-    # This is a simplified retry - in a real app, we'd need to re-upload or 
-    # keep the bytes in a short-lived cache (like Redis or memory).
-    # For now, we assume the user re-uploads or we find a way to re-trigger.
+    # Ownership/session check would happen in a real implementation
+    # For now, it stays as a stub but with auth requirement.
     # TODO: Implement robust byte-level retry logic if needed.
     return {"message": "Retry logic triggered (Stub)"}
 
@@ -99,10 +104,10 @@ async def force_reparse(
     session_id: str,
     file_hash: str,
     background_tasks: BackgroundTasks,
-    user_id: str = Form(...),
     ay: str = Form(...),
     doc_type: str = Form(...),
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: UserPrincipal = Depends(get_current_user)
 ):
     """
     Identical to upload but explicitly sets force_reparse=True.
@@ -110,6 +115,6 @@ async def force_reparse(
     file_bytes = await file.read()
     background_tasks.add_task(
         ITRProcessingService.process_document,
-        session_id, user_id, ay, doc_type, file.filename, file_bytes, force_reparse=True
+        session_id, current_user.id, ay, doc_type, file.filename, file_bytes, force_reparse=True
     )
     return {"message": "Force re-parse started."}

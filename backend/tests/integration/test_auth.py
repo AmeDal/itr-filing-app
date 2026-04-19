@@ -10,7 +10,7 @@ async def test_signup_integration(async_client: AsyncClient):
     """
     payload = {
         "first_name": "John",
-        "middle_name": "Integration",
+        "middle_name": "Paul",
         "last_name": "Doe",
         "pan_number": "ABCDE1234F",
         "aadhar_number": "123456789012",

@@ -11,19 +11,25 @@ from backend.utils import now_ist
 
 logger = logging.getLogger(__name__)
 
-async def decrypt_user_doc(user_doc: Optional[dict]) -> Optional[dict]:
-    """Helper to decrypt all encrypted fields in a user document before returning."""
+async def decrypt_user_doc(user_doc: Optional[dict], skip_fields: Optional[set] = None) -> Optional[dict]:
+    """
+    Helper to decrypt all encrypted fields in a user document before returning.
+    Skips fields in skip_fields set. Password is skipped by default if skip_fields is not provided.
+    """
     if not user_doc:
         return None
         
     doc = user_doc.copy()
+    if skip_fields is None:
+        skip_fields = {"password"}
+
     fields_to_decrypt = [
         "first_name", "middle_name", "last_name", "pan_number", 
         "aadhar_number", "aadhar_pincode", "mobile_number", "email",
-        "password"
+        "password", "role", "is_active"
     ]
     for field in fields_to_decrypt:
-        if field in doc and doc[field] is not None:
+        if field in doc and doc[field] is not None and field not in skip_fields:
             doc[field] = await CryptoService.decrypt_field(doc[field])
             
     return doc
@@ -73,6 +79,8 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
         "mobile_number": await CryptoService.encrypt_deterministic(req.mobile_number),
         "email": enc_email,
         "password": await CryptoService.encrypt_random(hash_password(req.password)),
+        "role": await CryptoService.encrypt_deterministic(getattr(req, "role", "user")),
+        "is_active": await CryptoService.encrypt_deterministic(True),
         "created_at": now_ist(),
         "updated_at": None
     }

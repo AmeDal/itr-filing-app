@@ -101,7 +101,7 @@ class DatabaseManager:
 
         identity_fields = {
             k: v
-            for k, v in seed_data.items() if k != "password"
+            for k, v in seed_data.items() if k not in ("password", "role", "is_active")
         }
         user_id = generate_oid(**identity_fields)
 
@@ -116,7 +116,7 @@ class DatabaseManager:
                 "aadhar_number", "aadhar_pincode", "mobile_number", "email"
             ]
             for field in identity_fields_to_encrypt:
-                if field in seed_data:
+                if field in seed_data and seed_data[field]:
                     seed_data[field] = await CryptoService.encrypt_deterministic(seed_data[field])
             
             plain_pwd = seed_data["password"]
@@ -125,11 +125,24 @@ class DatabaseManager:
 
             user_doc = {
                 "_id": user_id,
-                **seed_data, "created_at": now_ist(),
+                **seed_data, 
+                "role": await CryptoService.encrypt_deterministic(seed_data.get("role", "admin")),
+                "is_active": await CryptoService.encrypt_deterministic(seed_data.get("is_active", True)),
+                "created_at": now_ist(),
                 "updated_at": None
             }
             await cls.db.users.insert_one(user_doc)
         else:
+            # Migration: ensure existing seed user has role and is_active
+            if "role" not in existing or "is_active" not in existing:
+                logger.info(f"Updating seed user {user_id} with role/is_active")
+                await cls.db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {
+                        "role": await CryptoService.encrypt_deterministic(seed_data.get("role", "admin")),
+                        "is_active": await CryptoService.encrypt_deterministic(seed_data.get("is_active", True))
+                    }}
+                )
             logger.debug("Seed user already exists.")
 
     @classmethod

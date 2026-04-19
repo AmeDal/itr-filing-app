@@ -100,7 +100,8 @@ async def initialize_batch(
     batch_id: str,
     files: List[UploadFile],
     doc_types: List[str],
-    passwords: List[Optional[str]]
+    passwords: List[Optional[str]],
+    created_by_user_id: str
 ) -> List[tuple[str, bytes, str, str, Optional[str]]]:
     """
     Saves initial records to DB and prepares file data for background task.
@@ -118,6 +119,7 @@ async def initialize_batch(
             "batch_id": batch_id,
             "doc_type": doc_type,
             "status": "queued",
+            "created_by_user_id": created_by_user_id,
             "created_at": now_ist()
         }
         await db.documents.insert_one(doc_doc)

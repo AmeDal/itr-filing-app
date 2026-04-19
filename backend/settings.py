@@ -13,7 +13,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-flash-preview"
-    debug: bool = False
+    debug: bool = False  # True = Dev/Local, False = Production
 
     mongo_uri: str = "http://localhost:27017"
     mongo_db_name: str = "itr_filing"
@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     azure_storage_connection_string: str = ""
     azure_storage_container_name: str = "itr-extractions"
 
+    # JWT Settings
+    jwt_secret: str = ""
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 10
+    refresh_token_expire_days: int = 1
+
     seed_first_name: str = ""
     seed_middle_name: str = ""
     seed_last_name: str = ""
@@ -33,6 +39,11 @@ class Settings(BaseSettings):
     seed_mobile_number: str = ""
     seed_email: str = ""
     seed_password: str = ""
+    seed_role: str = "admin"
+    seed_is_active: bool = True
+    
+    # Cookie Settings
+    refresh_token_cookie_path: str = "/api/v1/users/refresh"
 
     def get_seed_user_dict(self) -> Dict[str, Any]:
         """Returns the seed user details as a dictionary formatted for document storage."""
@@ -45,7 +56,9 @@ class Settings(BaseSettings):
             "aadhar_pincode": self.seed_aadhar_pincode,
             "mobile_number": self.seed_mobile_number,
             "email": self.seed_email,
-            "password": self.seed_password
+            "password": self.seed_password,
+            "role": self.seed_role,
+            "is_active": self.seed_is_active
         }
 
 

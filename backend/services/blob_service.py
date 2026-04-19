@@ -151,6 +151,26 @@ class BlobStorageService:
         return results
 
     @classmethod
+    async def delete_user_blobs(cls, user_id: str):
+        """
+        Deletes all blobs under the user's root prefix.
+        """
+        settings = get_settings()
+        prefix = f"{user_id}/"
+        client = cls.get_client()
+        
+        try:
+            container_client = client.get_container_client(settings.azure_storage_container_name)
+            async for blob in container_client.list_blobs(name_starts_with=prefix):
+                logger.info(f"Deleting blob: {blob.name}")
+                await container_client.delete_blob(blob.name)
+        except ResourceNotFoundError:
+            pass
+        except Exception as e:
+            logger.error(f"Error deleting user blobs: {e}")
+            raise e
+
+    @classmethod
     async def close(cls):
         """Closes the client and its transport."""
         if cls._client:

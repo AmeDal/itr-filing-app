@@ -22,6 +22,28 @@ def mask_uri(uri: str) -> str:
     return re.sub(r'://([^:]+):([^@]+)@', r'://****:****@', uri)
 
 
+def mask_pii(value: str, visible_chars: int = 4) -> str:
+    """Masks all but the last visible_chars of a string."""
+    if not value:
+        return ""
+    s = str(value)
+    if len(s) <= visible_chars:
+        return s
+    return "*" * (len(s) - visible_chars) + s[-visible_chars:]
+
+
+def mask_email(email: str) -> str:
+    """Masks an email address for logging."""
+    if not email or "@" not in email:
+        return email
+    parts = email.split("@")
+    name = parts[0]
+    domain = parts[1]
+    if len(name) <= 1:
+        return "*" + "@" + domain
+    return name[0] + "*" * (len(name) - 1) + "@" + domain
+
+
 def map_error_to_friendly_message(error: Exception) -> str:
     """
     Maps technical exceptions (like API errors) to user-friendly strings.

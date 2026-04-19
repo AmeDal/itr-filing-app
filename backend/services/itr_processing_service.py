@@ -25,9 +25,10 @@ class SessionManager:
     _listeners: Dict[str, List[asyncio.Queue]] = {}
 
     @classmethod
-    def create_session(cls, session_id: str, documents: List[Dict[str, Any]]):
+    def create_session(cls, session_id: str, owner_user_id: str, documents: List[Dict[str, Any]]):
         cls._sessions[session_id] = {
             "status": "processing",
+            "owner_user_id": owner_user_id,
             "documents": {doc["file_hash"]: {**doc, "completed_pages": 0, "status": "queued"} for doc in documents},
             "created_at": datetime.now().isoformat()
         }
@@ -62,7 +63,11 @@ class SessionManager:
                 queue.put_nowait(json.dumps(state))
 
     @classmethod
-    async def subscribe(cls, session_id: str):
+    async def subscribe(cls, session_id: str, user_id: str):
+        if session_id in cls._sessions and cls._sessions[session_id]["owner_user_id"] != user_id:
+             # Basic ownership check
+             return
+
         queue = asyncio.Queue()
         if session_id not in cls._listeners:
             cls._listeners[session_id] = []

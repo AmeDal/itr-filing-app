@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, Depends
 
 from backend.db import DatabaseManager
 from backend.schemas.extraction_schema import (
@@ -14,6 +14,7 @@ from backend.schemas.extraction_schema import (
 )
 from backend.services.batch_service import initialize_batch, process_batch_extraction
 from backend.services.llm_service import extract_aadhar_data, extract_pan_data
+from backend.auth_deps import get_current_user, UserPrincipal
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/extract", tags=["Extraction"])
@@ -23,7 +24,8 @@ router = APIRouter(prefix="/v1/extract", tags=["Extraction"])
 async def extract_document(
     doc_type: str = Form(..., description="Either 'PAN' or 'AADHAR'"),
     file: UploadFile = File(...),
-    password: Optional[str] = Form(None)
+    password: Optional[str] = Form(None),
+    current_user: UserPrincipal = Depends(get_current_user)
 ):
     if doc_type.upper() not in ["PAN", "AADHAR"]:
         raise HTTPException(status_code=400, detail="doc_type must be PAN or AADHAR")
@@ -48,7 +50,8 @@ async def extract_batch_docs(
     background_tasks: BackgroundTasks,
     doc_types: str = Form(..., description="JSON list of doc types"),
     files: List[UploadFile] = File(...),
-    passwords: Optional[str] = Form(None, description="JSON list of passwords")
+    passwords: Optional[str] = Form(None, description="JSON list of passwords"),
+    current_user: UserPrincipal = Depends(get_current_user)
 ):
     try:
         dt_list = json.loads(doc_types)
@@ -79,21 +82,35 @@ async def extract_batch_docs(
         p_list.extend([None] * (len(files) - len(p_list)))
 
     batch_id = str(uuid.uuid4())
-    prepared_files = await initialize_batch(batch_id, files, [dt.upper() for dt in dt_list], p_list)
+    prepared_files = await initialize_batch(
+        batch_id, 
+        files, 
+        [dt.upper() for dt in dt_list], 
+        p_list,
+        created_by_user_id=current_user.id
+    )
     background_tasks.add_task(process_batch_extraction, batch_id, prepared_files)
 
     return BatchExtractionInitiatedResponse(batch_id=batch_id)
 
 
 @router.get("/status/{batch_id}", response_model=BatchStatusResponse)
-async def get_batch_status(batch_id: str):
+async def get_batch_status(
+    batch_id: str,
+    current_user: UserPrincipal = Depends(get_current_user)
+):
     db = DatabaseManager.get_db()
 
-    cursor = db.documents.find({"batch_id": batch_id}).sort("created_at", 1)
+    # Verify ownership
+    cursor = db.documents.find({
+        "batch_id": batch_id,
+        "created_by_user_id": current_user.id
+    }).sort("created_at", 1)
+    
     rows = await cursor.to_list(length=100)
 
     if not rows:
-        raise HTTPException(status_code=404, detail="Batch not found")
+        raise HTTPException(status_code=404, detail="Batch not found or access denied")
 
     documents = []
     all_done = True

@@ -1,10 +1,14 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { LogIn, UserPlus, ArrowRight, ShieldCheck, Mail, Phone, Lock, Hash, MapPin, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { LogIn, UserPlus, ArrowRight, ShieldCheck, Mail, Phone, Lock, Hash, MapPin, AlertCircle, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 const AuthPage = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { login, isAuthenticated, isLoading: authLoading } = useAuth();
+    
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -23,6 +27,14 @@ const AuthPage = () => {
         password: ''
     });
 
+    // Auto-redirect if already authenticated
+    useEffect(() => {
+        if (!authLoading && isAuthenticated) {
+            const destination = location.state?.from?.pathname || '/itr-select';
+            navigate(destination, { replace: true });
+        }
+    }, [isAuthenticated, authLoading, navigate, location]);
+
     // Validation Logic
     const validations = useMemo(() => {
         const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
@@ -37,7 +49,7 @@ const AuthPage = () => {
             mobile: mobileRegex.test(form.mobile_number),
             pincode: pincodeRegex.test(form.aadhar_pincode),
             email: emailRegex.test(form.email),
-            password: form.password.length >= 8,
+            password: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/.test(form.password),
             first_name: form.first_name.trim().length > 0,
             last_name: form.last_name.trim().length > 0
         };
@@ -65,14 +77,15 @@ const AuthPage = () => {
 
         try {
             if (isLogin) {
-                const user = await apiService.login(form.pan_number, form.password);
-                setSuccess(`Welcome back, ${user.first_name}!`);
+                const data = await login(form.pan_number, form.password);
+                setSuccess(`Welcome back, ${data.user.first_name}!`);
             } else {
-                const user = await apiService.signup({
+                await apiService.signup({
                     ...form,
                     aadhar_number: form.aadhar_number.replace(/\s/g, '')
                 });
-                setSuccess(`Account created! Welcome, ${user.first_name}.`);
+                setSuccess(`Account created! You can now log in.`);
+                setIsLogin(true); // Switch to login after signup
             }
         } catch (err) {
             setError(err.message || "An unexpected error occurred");
@@ -81,7 +94,15 @@ const AuthPage = () => {
         }
     };
 
-    if (success) {
+    if (authLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
+                <Loader2 className="w-12 h-12 text-primary animate-spin" />
+            </div>
+        );
+    }
+
+    if (success && isLogin) {
         return (
             <div className="auth-container">
                 <div className="glass-card" style={{ textAlign: 'center' }}>
@@ -147,7 +168,7 @@ const AuthPage = () => {
                                 </div>
                                 {form.aadhar_number && !validations.aadhar && <span className="error-text">Invalid Aadhar</span>}
                             </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                                 <div className="input-group">
                                     <label className="input-label">Pincode</label>
                                     <input type="text" name="aadhar_pincode" className="input-field" style={{ borderColor: form.aadhar_pincode && !validations.pincode ? 'var(--error)' : '' }} placeholder="400001" required value={form.aadhar_pincode} onChange={handleChange} maxLength={6} />
@@ -180,7 +201,34 @@ const AuthPage = () => {
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </div>
                         </div>
-                        {form.password && !validations.password && <span className="error-text">Min 8 characters</span>}
+                        {!isLogin && (
+                            <div style={{ marginTop: '0.75rem', padding: '0.75rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: '8px' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', fontWeight: 600 }}>Password Requirements:</div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                    <div style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: form.password.length >= 12 ? 'var(--success)' : 'rgba(255, 255, 255, 0.3)' }}>
+                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}></div>
+                                        12+ Characters
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: /[A-Z]/.test(form.password) ? 'var(--success)' : 'rgba(255, 255, 255, 0.3)' }}>
+                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}></div>
+                                        Uppercase
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: /[a-z]/.test(form.password) ? 'var(--success)' : 'rgba(255, 255, 255, 0.3)' }}>
+                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}></div>
+                                        Lowercase
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: /\d/.test(form.password) ? 'var(--success)' : 'rgba(255, 255, 255, 0.3)' }}>
+                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}></div>
+                                        Numbers
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.35rem', color: /[@$!%*?&]/.test(form.password) ? 'var(--success)' : 'rgba(255, 255, 255, 0.3)' }}>
+                                        <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'currentColor' }}></div>
+                                        Special (@$!%*?&)
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {form.password && !isLogin && !validations.password && <span className="error-text">Please meet all requirements</span>}
                     </div>
 
                     {error && (
@@ -189,15 +237,21 @@ const AuthPage = () => {
                         </div>
                     )}
 
+                    {success && !isLogin && (
+                         <div className="success-text" style={{ marginBottom: '1.5rem', textAlign: 'center', color: 'var(--success)', background: 'rgba(16, 185, 129, 0.1)', padding: '0.75rem', borderRadius: '10px' }}>
+                            {success}
+                         </div>
+                    )}
+
                     <button className="btn btn-primary" type="submit" disabled={loading || !isFormValid}>
-                        {loading ? <div className="loading-spinner"></div> : (isLogin ? 'Login Now' : 'Create Account')}
+                        {loading ? <Loader2 className="animate-spin" size={18} /> : (isLogin ? 'Login Now' : 'Create Account')}
                         {!loading && (isLogin ? <LogIn size={18} /> : <UserPlus size={18} />)}
                     </button>
                 </form>
 
                 <div className="auth-toggle">
                     {isLogin ? "Don't have an account? " : "Already have an account? "}
-                    <b onClick={() => setIsLogin(!isLogin)}>{isLogin ? 'Sign Up' : 'Log In'}</b>
+                    <b onClick={() => { setIsLogin(!isLogin); setError(null); setSuccess(null); }}>{isLogin ? 'Sign Up' : 'Log In'}</b>
                 </div>
             </div>
         </div>

@@ -1,7 +1,7 @@
 import asyncio
 import base64
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from bson import Binary
 from pymongo import MongoClient
@@ -104,7 +104,7 @@ class CryptoService:
         return dek_id
 
     @classmethod
-    def _encrypt_sync(cls, value: str, algorithm: str) -> Binary:
+    def _encrypt_sync(cls, value: Any, algorithm: str) -> Binary:
         """Synchronous encrypt — called via asyncio.to_thread."""
         if cls._client_encryption is None or cls._data_key_id is None:
             raise RuntimeError(
@@ -121,7 +121,7 @@ class CryptoService:
         )
 
     @classmethod
-    def _decrypt_sync(cls, ciphertext: Binary) -> str:
+    def _decrypt_sync(cls, ciphertext: Binary) -> Any:
         """Synchronous decrypt — called via asyncio.to_thread."""
         if cls._client_encryption is None:
             raise RuntimeError(
@@ -133,7 +133,7 @@ class CryptoService:
         return cls._client_encryption.decrypt(ciphertext)
 
     @classmethod
-    async def encrypt_random(cls, value: str) -> Binary:
+    async def encrypt_random(cls, value: Any) -> Binary:
         """
         Encrypts a highly sensitive field (e.g. password) that does NOT need to be queried.
         """
@@ -141,17 +141,21 @@ class CryptoService:
                                        cls._ALGORITHM_RANDOM)
 
     @classmethod
-    async def encrypt_deterministic(cls, value: str) -> Binary:
+    async def encrypt_deterministic(cls, value: Any) -> Binary:
         """
         Encrypts a sensitive field allowing for exact equality queries (Deterministic).
+        Note: Booleans are automatically cast to int (1/0) because bool is not 
+        supported for deterministic encryption in many CSFLE implementations.
         """
+        if isinstance(value, bool):
+            value = 1 if value else 0
         return await asyncio.to_thread(cls._encrypt_sync, value,
                                        cls._ALGORITHM_DETERMINISTIC)
 
     @classmethod
-    async def decrypt_field(cls, ciphertext: Binary) -> str:
+    async def decrypt_field(cls, ciphertext: Binary) -> Any:
         """
-        Decrypts a CSFLE-encrypted Binary field back to a string.
+        Decrypts a CSFLE-encrypted Binary field back to a string or original type.
 
         Runs in a thread to avoid blocking the async event loop.
         """
