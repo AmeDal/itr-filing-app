@@ -3,20 +3,15 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.controllers.admin_router import router as admin_router
 from backend.controllers.extraction_router import router as extraction_router
 from backend.controllers.itr_router import router as itr_router
 from backend.controllers.user_router import router as user_router
-from backend.controllers.admin_router import router as admin_router
 from backend.db import DatabaseManager
 from backend.services.blob_service import BlobStorageService
 from backend.settings import get_settings
 
 settings = get_settings()
-app = FastAPI(
-    title="ITR Filing App",
-    description="Production-grade ITR Filing Application with Async MongoDB",
-    lifespan=lifespan)
-api_router = APIRouter(prefix="/api")
 
 
 @asynccontextmanager
@@ -28,6 +23,13 @@ async def lifespan(app: FastAPI):
     await DatabaseManager.close()
     await BlobStorageService.close()
 
+
+app = FastAPI(
+    title="ITR Filing App",
+    description="Production-grade ITR Filing Application with Async MongoDB",
+    lifespan=lifespan
+)
+api_router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,

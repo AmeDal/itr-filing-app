@@ -109,23 +109,23 @@ class DatabaseManager:
         if not existing:
             logger.info(f"Seeding initial user with _id: {user_id}")
             seed_data = seed_data.copy()
-            
+
             # Encrypt identity fields deterministically
             identity_fields_to_encrypt = [
-                "first_name", "middle_name", "last_name", "pan_number", 
+                "first_name", "middle_name", "last_name", "pan_number",
                 "aadhar_number", "aadhar_pincode", "mobile_number", "email"
             ]
             for field in identity_fields_to_encrypt:
                 if field in seed_data and seed_data[field]:
                     seed_data[field] = await CryptoService.encrypt_deterministic(seed_data[field])
-            
+
             plain_pwd = seed_data["password"]
             hashed_pwd = hash_password(plain_pwd)
             seed_data["password"] = await CryptoService.encrypt_random(hashed_pwd)
 
             user_doc = {
                 "_id": user_id,
-                **seed_data, 
+                **seed_data,
                 "role": await CryptoService.encrypt_deterministic(seed_data.get("role", "admin")),
                 "is_active": await CryptoService.encrypt_deterministic(seed_data.get("is_active", True)),
                 "created_at": now_ist(),

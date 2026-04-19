@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 import jwt
+from bson import ObjectId
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
@@ -54,7 +55,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme),
 
     # Check DB for active status
     try:
-        from bson import ObjectId
         logger.debug(f"Looking up user in DB: {mask_pii(user_id)}")
         user = await db.users.find_one({"_id": ObjectId(user_id)})
     except Exception as e:
