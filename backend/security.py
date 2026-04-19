@@ -1,15 +1,13 @@
-from passlib.context import CryptContext
 import re
 
+from passlib.context import CryptContext
 
-# Argon2 is more secure than bcrypt (winner of Password Hashing Competition 2015)
 pwd_context = CryptContext(
     schemes=["argon2"],
     argon2__memory_cost=65536,  # 64 MB
     argon2__time_cost=3,        # 3 iterations
     argon2__parallelism=4       # 4 threads
 )
-
 MIN_PASSWORD_LENGTH = 12
 PASSWORD_PATTERN = re.compile(
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$")

@@ -1,14 +1,12 @@
 import asyncio
 import base64
-import logging
 from typing import Any, Optional
 
 from bson import Binary
 from pymongo import MongoClient
 from pymongo.encryption import Algorithm, ClientEncryption
-from pymongo.encryption_options import AutoEncryptionOpts  # noqa: F401 - for type reference
 
-logger = logging.getLogger(__name__)
+from backend.logger import logger
 
 
 class CryptoService:
@@ -144,7 +142,7 @@ class CryptoService:
     async def encrypt_deterministic(cls, value: Any) -> Binary:
         """
         Encrypts a sensitive field allowing for exact equality queries (Deterministic).
-        Note: Booleans are automatically cast to int (1/0) because bool is not 
+        Note: Booleans are automatically cast to int (1/0) because bool is not
         supported for deterministic encryption in many CSFLE implementations.
         """
         if isinstance(value, bool):

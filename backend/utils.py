@@ -1,9 +1,7 @@
-import logging
 import re
 from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
-logger = logging.getLogger(__name__)
 
 
 def now_ist():

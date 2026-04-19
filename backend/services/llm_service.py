@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from typing import List, Optional, Tuple
 
 import fitz
@@ -7,11 +6,11 @@ import google.genai as genai
 from google.genai import types
 from google.genai.errors import APIError
 
+from backend.logger import logger
 from backend.schemas.extraction_schema import AadharExtractionResponse, PanExtractionResponse
 from backend.settings import get_settings
 
 PDF_TEXT_THRESHOLD = 50
-logger = logging.getLogger(__name__)
 
 
 class PDFPasswordRequired(Exception):

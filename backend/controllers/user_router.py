@@ -1,21 +1,20 @@
-import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, HTTPException, Response, Cookie, Depends
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
 from fastapi.security import OAuth2PasswordRequestForm
 
-from backend.schemas.user_schema import (UserCreateRequest, UserLoginRequest,
-                                         UserResponse, UserSummary,
-                                         AuthResponse, TokenRefreshResponse)
+from backend.auth_deps import UserPrincipal, get_current_user, oauth2_scheme
+from backend.logger import logger
+from backend.schemas.user_schema import (AuthResponse, TokenRefreshResponse,
+                                         UserCreateRequest, UserLoginRequest,
+                                         UserResponse, UserSummary)
 from backend.services import user_service
 from backend.services.auth_service import (create_access_token,
                                            create_refresh_token, decode_token,
                                            revoke_token)
-from backend.auth_deps import get_current_user, UserPrincipal, oauth2_scheme
 from backend.settings import get_settings
-from backend.utils import mask_pii, mask_email
+from backend.utils import mask_email, mask_pii
 
-logger = logging.getLogger(__name__)
 settings = get_settings()
 router = APIRouter(prefix="/v1/users", tags=["Users"])
 
@@ -37,7 +36,8 @@ async def signup(req: UserCreateRequest):
             f"Signup validation error for {mask_email(req.email)}: {e}")
         raise HTTPException(status_code=409, detail=str(e))
     except Exception:
-        logger.exception(f"Unexpected signup failure for {mask_email(req.email)}")
+        logger.exception(
+            f"Unexpected signup failure for {mask_email(req.email)}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -87,7 +87,8 @@ async def login(response: Response,
             "expires_in": settings.access_token_expire_minutes * 60,
             "user": user_summary
         }
-        logger.info(f"Login success for: {mask_pii(pan)}. Returning result dict.")
+        logger.info(
+            f"Login success for: {mask_pii(pan)}. Returning result dict.")
         return res_data
     except HTTPException:
         raise
@@ -138,7 +139,8 @@ async def refresh(response: Response,
                             max_age=settings.refresh_token_expire_days * 24 *
                             60 * 60)
 
-        logger.info(f"Tokens successfully rotated for user: {mask_pii(user_id)}")
+        logger.info(
+            f"Tokens successfully rotated for user: {mask_pii(user_id)}")
         return TokenRefreshResponse(
             access_token=new_access,
             expires_in=settings.access_token_expire_minutes * 60)

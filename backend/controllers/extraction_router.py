@@ -1,12 +1,13 @@
 import json
-import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 
+from backend.auth_deps import UserPrincipal, get_current_user
 from backend.db import DatabaseManager
+from backend.logger import logger
 from backend.schemas.extraction_schema import (
     BatchExtractionInitiatedResponse,
     BatchStatusResponse,
@@ -14,9 +15,7 @@ from backend.schemas.extraction_schema import (
 )
 from backend.services.batch_service import initialize_batch, process_batch_extraction
 from backend.services.llm_service import extract_aadhar_data, extract_pan_data
-from backend.auth_deps import get_current_user, UserPrincipal
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/extract", tags=["Extraction"])
 
 
@@ -83,9 +82,9 @@ async def extract_batch_docs(
 
     batch_id = str(uuid.uuid4())
     prepared_files = await initialize_batch(
-        batch_id, 
-        files, 
-        [dt.upper() for dt in dt_list], 
+        batch_id,
+        files,
+        [dt.upper() for dt in dt_list],
         p_list,
         created_by_user_id=current_user.id
     )
@@ -106,7 +105,7 @@ async def get_batch_status(
         "batch_id": batch_id,
         "created_by_user_id": current_user.id
     }).sort("created_at", 1)
-    
+
     rows = await cursor.to_list(length=100)
 
     if not rows:

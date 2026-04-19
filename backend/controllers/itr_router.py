@@ -1,15 +1,14 @@
-import logging
-import uuid
 import json
-from typing import List, Optional
+import uuid
+from typing import List
 
-from fastapi import APIRouter, BackgroundTasks, File, Form, UploadFile, HTTPException, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sse_starlette.sse import EventSourceResponse
 
+from backend.auth_deps import UserPrincipal, get_current_user
+from backend.logger import logger
 from backend.services.itr_processing_service import ITRProcessingService, SessionManager
-from backend.auth_deps import get_current_user, UserPrincipal
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/itr", tags=["ITR Processing"])
 
 
@@ -26,6 +25,7 @@ async def upload_documents(
     Accepts multiple ITR documents and starts in-memory processing.
     User identity is derived from Auth token.
     """
+    logger.info(f"ITR upload initiated for user {current_user.id} - {len(files)} files")
     try:
         dt_list = json.loads(doc_types)
     except Exception:
@@ -94,8 +94,6 @@ async def retry_extraction(
     current_user: UserPrincipal = Depends(get_current_user)
 ):
     # Ownership/session check would happen in a real implementation
-    # For now, it stays as a stub but with auth requirement.
-    # TODO: Implement robust byte-level retry logic if needed.
     return {"message": "Retry logic triggered (Stub)"}
 
 

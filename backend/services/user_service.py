@@ -1,4 +1,3 @@
-import logging
 from typing import Optional
 
 from bson import ObjectId
@@ -9,30 +8,32 @@ from backend.security import hash_password, verify_password
 from backend.services.crypto_service import CryptoService
 from backend.utils import now_ist
 
-logger = logging.getLogger(__name__)
 
-async def decrypt_user_doc(user_doc: Optional[dict], skip_fields: Optional[set] = None) -> Optional[dict]:
+async def decrypt_user_doc(
+        user_doc: Optional[dict],
+        skip_fields: Optional[set] = None) -> Optional[dict]:
     """
     Helper to decrypt all encrypted fields in a user document before returning.
     Skips fields in skip_fields set. Password is skipped by default if skip_fields is not provided.
     """
     if not user_doc:
         return None
-        
+
     doc = user_doc.copy()
     if skip_fields is None:
         skip_fields = {"password"}
 
     fields_to_decrypt = [
-        "first_name", "middle_name", "last_name", "pan_number", 
+        "first_name", "middle_name", "last_name", "pan_number",
         "aadhar_number", "aadhar_pincode", "mobile_number", "email",
         "password", "role", "is_active"
     ]
     for field in fields_to_decrypt:
         if field in doc and doc[field] is not None and field not in skip_fields:
             doc[field] = await CryptoService.decrypt_field(doc[field])
-            
+
     return doc
+
 
 async def create_user(req: UserCreateRequest) -> UserResponse:
     """
@@ -43,12 +44,12 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
     enc_pan = await CryptoService.encrypt_deterministic(req.pan_number.upper())
     enc_email = await CryptoService.encrypt_deterministic(req.email.lower())
 
-    existing = await db.users.find_one({
-        "$or": [
-            {"pan_number": enc_pan},
-            {"email": enc_email}
-        ]
-    })
+    existing = await db.users.find_one(
+        {"$or": [{
+            "pan_number": enc_pan
+        }, {
+            "email": enc_email
+        }]})
 
     if existing:
         # Check against the search encrypted values
@@ -57,32 +58,41 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
 
         raise ValueError("A user with this email already exists.")
 
-    user_id = generate_oid(
-        req.first_name,
-        req.middle_name,
-        req.last_name,
-        req.pan_number,
-        req.aadhar_number,
-        req.aadhar_pincode,
-        req.mobile_number,
-        req.email
-    )
+    user_id = generate_oid(req.first_name, req.middle_name, req.last_name,
+                           req.pan_number, req.aadhar_number,
+                           req.aadhar_pincode, req.mobile_number, req.email)
 
     user_doc = {
-        "_id": user_id,
-        "first_name": await CryptoService.encrypt_deterministic(req.first_name),
-        "middle_name": await CryptoService.encrypt_deterministic(req.middle_name) if req.middle_name else None,
-        "last_name": await CryptoService.encrypt_deterministic(req.last_name),
-        "pan_number": enc_pan,
-        "aadhar_number": await CryptoService.encrypt_deterministic(req.aadhar_number),
-        "aadhar_pincode": await CryptoService.encrypt_deterministic(req.aadhar_pincode),
-        "mobile_number": await CryptoService.encrypt_deterministic(req.mobile_number),
-        "email": enc_email,
-        "password": await CryptoService.encrypt_random(hash_password(req.password)),
-        "role": await CryptoService.encrypt_deterministic(getattr(req, "role", "user")),
-        "is_active": await CryptoService.encrypt_deterministic(True),
-        "created_at": now_ist(),
-        "updated_at": None
+        "_id":
+        user_id,
+        "first_name":
+        await CryptoService.encrypt_deterministic(req.first_name),
+        "middle_name":
+        await CryptoService.encrypt_deterministic(req.middle_name)
+        if req.middle_name else None,
+        "last_name":
+        await CryptoService.encrypt_deterministic(req.last_name),
+        "pan_number":
+        enc_pan,
+        "aadhar_number":
+        await CryptoService.encrypt_deterministic(req.aadhar_number),
+        "aadhar_pincode":
+        await CryptoService.encrypt_deterministic(req.aadhar_pincode),
+        "mobile_number":
+        await CryptoService.encrypt_deterministic(req.mobile_number),
+        "email":
+        enc_email,
+        "password":
+        await CryptoService.encrypt_random(hash_password(req.password)),
+        "role":
+        await CryptoService.encrypt_deterministic(getattr(req, "role",
+                                                          "user")),
+        "is_active":
+        await CryptoService.encrypt_deterministic(True),
+        "created_at":
+        now_ist(),
+        "updated_at":
+        None
     }
 
     await db.users.insert_one(user_doc)
@@ -100,7 +110,8 @@ async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
     user_doc = await db.users.find_one({"pan_number": enc_pan})
 
     if user_doc and "password" in user_doc:
-        decrypted_hash = await CryptoService.decrypt_field(user_doc["password"])
+        decrypted_hash = await CryptoService.decrypt_field(user_doc["password"]
+                                                           )
         if verify_password(req.password, decrypted_hash):
             decrypted_doc = await decrypt_user_doc(user_doc)
             return UserResponse(**decrypted_doc)

@@ -11,6 +11,13 @@ from backend.db import DatabaseManager
 from backend.services.blob_service import BlobStorageService
 from backend.settings import get_settings
 
+settings = get_settings()
+app = FastAPI(
+    title="ITR Filing App",
+    description="Production-grade ITR Filing Application with Async MongoDB",
+    lifespan=lifespan)
+api_router = APIRouter(prefix="/api")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,15 +29,6 @@ async def lifespan(app: FastAPI):
     await BlobStorageService.close()
 
 
-app = FastAPI(
-    title="ITR Filing App",
-    description="Production-grade ITR Filing Application with Async MongoDB",
-    lifespan=lifespan)
-
-# Shared API Router for versioning and prefixes
-api_router = APIRouter(prefix="/api")
-
-settings = get_settings()
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_allowed_origins,
