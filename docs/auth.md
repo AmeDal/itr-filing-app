@@ -128,6 +128,7 @@ stateDiagram-v2
 For `credentials: 'include'` to work:
 - `Access-Control-Allow-Origin` **must not** be `*` — use specific origin(s)
 - `Access-Control-Allow-Credentials` must be `true`
+- Configured via `cors_allowed_origins` in `settings.py` and `CORS_ALLOWED_ORIGINS` in `.env`.
 
 ---
 

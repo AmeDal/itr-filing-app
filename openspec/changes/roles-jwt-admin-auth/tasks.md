@@ -31,6 +31,6 @@
 
 ## 5. Hardening & Finalization
 
-- [ ] 5.1 Implement integration tests in `backend/tests/integration/test_auth.py`.
-- [ ] 5.2 Configure project-wide CORS to specific origins.
-- [ ] 5.3 Update `AGENTS.md` and project documentation.
+- [x] 5.1 Implement integration tests in `backend/tests/integration/test_auth.py`.
+- [x] 5.2 Configure project-wide CORS to specific origins.
+- [x] 5.3 Update `AGENTS.md` and project documentation.

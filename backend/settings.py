@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-flash-preview"
     debug: bool = False  # True = Dev/Local, False = Production
+    cors_allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
     mongo_uri: str = "http://localhost:27017"
     mongo_db_name: str = "itr_filing"
