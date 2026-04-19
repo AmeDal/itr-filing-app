@@ -50,9 +50,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await fetch(`${API_BASE_URL}/users/refresh`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-        // Cookies are sent automatically with credentials: 'include' 
-        // if using custom fetch helper, but native fetch requires it
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
       });
 
       if (response.ok) {
@@ -60,7 +59,8 @@ export const AuthProvider = ({ children }) => {
         setAccessToken(data.access_token);
         // We might want to fetch user profile /me if needed
         const meRes = await fetch(`${API_BASE_URL}/users/me`, {
-          headers: { 'Authorization': `Bearer ${data.access_token}` }
+          headers: { 'Authorization': `Bearer ${data.access_token}` },
+          credentials: 'include'
         });
         if (meRes.ok) {
           const userData = await meRes.json();

@@ -27,9 +27,10 @@ The system must enforce specific formats for identity fields on both the fronten
 - **WHEN** a user enters a 9-character PAN or an 11-digit Aadhar number
 - **THEN** the system must prevent submission and display a field-specific error message.
 
-### Requirement: Simple PAN-Password Login
-The system must verify a user's existence based on the combination of their PAN and Password.
+### Requirement: Tokenized Login Response
+The system must verify credentials and return JWT tokens upon success.
 
 #### Scenario: Successful login
 - **WHEN** a user provides a valid PAN and their matching password
-- **THEN** the system should return the full user profile with a 200 OK status.
+- **THEN** the response must conform to the `AuthResponse` schema, containing tokens and a user summary, and securely set the refresh cookie.
+

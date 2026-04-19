@@ -41,6 +41,7 @@ const ProgressDashboardPage = () => {
         const es = apiService.connectProgressStream(
             sessionId,
             (data) => {
+                console.log("SSE Received:", data);
                 setSessionState(data);
                 setConnected(true);
                 setError(null);
@@ -52,7 +53,10 @@ const ProgressDashboardPage = () => {
             }
         );
 
-        return () => es.close();
+        return () => {
+            console.log("Closing SSE connection");
+            es(); // es is the abort function
+        };
     }, [sessionId, navigate]);
 
     const documents = useMemo(() => {
@@ -61,7 +65,7 @@ const ProgressDashboardPage = () => {
     }, [sessionState, initialDocuments]);
 
     const overallProgress = useMemo(() => {
-        if (documents.length === 0) return 0;
+        if (!documents || documents.length === 0) return 0;
         const total = documents.reduce((acc, doc) => acc + (doc.total_pages || 1), 0);
         const completed = documents.reduce((acc, doc) => acc + (doc.completed_pages || 0), 0);
         return Math.round((completed / total) * 100);
@@ -102,19 +106,20 @@ const ProgressDashboardPage = () => {
                 <div className="progress-list" style={{ maxHeight: '500px', overflowY: 'auto', paddingRight: '0.5rem' }}>
                     {documents.map((doc) => {
                         const progress = Math.round(((doc.completed_pages || 0) / (doc.total_pages || 1)) * 100);
-                        const isError = doc.status === 'failed' || doc.status === 'error';
+                        const isError = doc.status === 'failed' || doc.status === 'error' || doc.status === 'failed_page';
                         const isComplete = doc.status === 'completed';
+                        const docTypeDisplay = (doc.doc_type || 'Unknown').replace(/_/g, ' ');
 
                         return (
-                            <div key={doc.file_hash} className="progress-item">
+                            <div key={doc.file_hash || doc.file_name} className="progress-item">
                                 <div className="progress-header">
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                        <div style={{ p: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', display: 'flex' }}>
+                                        <div style={{ padding: '0.5rem', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', display: 'flex' }}>
                                             <FileText size={18} color="var(--text-secondary)" />
                                         </div>
                                         <div>
                                             <h4 style={{ margin: 0, fontSize: '0.95rem' }}>{doc.file_name}</h4>
-                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{doc.doc_type.replace('_', ' ')}</span>
+                                            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'capitalize' }}>{docTypeDisplay}</span>
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
@@ -146,6 +151,7 @@ const ProgressDashboardPage = () => {
                         );
                     })}
                 </div>
+
 
                 <footer style={{ marginTop: '3rem', display: 'flex', justifyContent: 'center' }}>
                     <button 

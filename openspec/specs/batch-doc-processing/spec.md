@@ -13,3 +13,10 @@ The system must initiate document extraction in the background without blocking 
 #### Scenario: Background processing starts
 - **WHEN** the batch ingestion request is successful
 - **THEN** background tasks should be spawned to process each document using the `llm_service`.
+
+### Requirement: Scoped Batch Extraction
+All document batches and their constituent documents must be bound to the authenticated user who initiated the upload.
+
+#### Scenario: User checks batch status
+- **WHEN** a user requests the status of a `batch_id`
+- **THEN** the system must only return results if the batch was created by that specific user, ensuring cross-user data isolation.

@@ -71,6 +71,7 @@ export const apiService = {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
       },
+      credentials: 'include',
       signal: ctrl.signal,
       async onopen(response) {
         if (!response.ok) {

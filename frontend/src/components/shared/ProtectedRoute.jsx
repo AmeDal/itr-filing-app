@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { Loader2 } from 'lucide-react';
 
 const ProtectedRoute = ({ requireAdmin = false }) => {
   const { isAuthenticated, isAdmin, isLoading } = useAuth();
@@ -8,8 +9,11 @@ const ProtectedRoute = ({ requireAdmin = false }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-primary"></div>
+      <div className="auth-container" style={{ background: 'var(--bg-dark)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+          <Loader2 className="loading-spinner" size={48} style={{ color: 'var(--accent-primary)', border: 'none' }} />
+          <p className="subtitle" style={{ margin: 0 }}>Authenticating...</p>
+        </div>
       </div>
     );
   }
@@ -28,3 +32,4 @@ const ProtectedRoute = ({ requireAdmin = false }) => {
 };
 
 export default ProtectedRoute;
+

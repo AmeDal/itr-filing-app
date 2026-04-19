@@ -5,30 +5,30 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env",
+                                      env_file_encoding="utf-8",
+                                      extra="ignore")
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3-flash-preview"
     debug: bool = False  # True = Dev/Local, False = Production
-    cors_allowed_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]
+    cors_allowed_origins: list[str] = [
+        "http://localhost:5173", "http://127.0.0.1:5173"
+    ]
 
     mongo_uri: str = "http://localhost:27017"
     mongo_db_name: str = "itr_filing"
 
     csfle_master_key: str = ""
     csfle_key_vault_namespace: str = "encryption.__keyVault"
-    
+
     azure_storage_connection_string: str = ""
     azure_storage_container_name: str = "itr-extractions"
 
     # JWT Settings
     jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 10
+    access_token_expire_minutes: int = 30
     refresh_token_expire_days: int = 1
 
     seed_first_name: str = ""
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     seed_password: str = ""
     seed_role: str = "admin"
     seed_is_active: bool = True
-    
+
     # Cookie Settings
     refresh_token_cookie_path: str = "/api/v1/users/refresh"
 
