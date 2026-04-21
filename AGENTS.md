@@ -42,6 +42,7 @@
 | `backend/services/prompt_templates.py` | Doc-type specific Gemini prompts |
 | `backend/services/token_blocklist.py` | JWT revocation blocklist (in-memory v1) |
 | `backend/services/auth_service.py` | JWT issuance and validation logic |
+| `backend/services/pdf_service.py` | Shared PDF helpers that offload PyMuPDF parsing/rasterization to worker threads |
 | `backend/services/user_deletion_service.py` | Cascade hard-delete (Mongo + Azure Blobs) |
 | `backend/services/` | `*_service.py` — business logic, one file per task |
 | `backend/schemas/` | `*_schema.py` — Pydantic request + response schemas |

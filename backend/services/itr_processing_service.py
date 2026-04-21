@@ -4,12 +4,12 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List
 
-import fitz
 from google.genai import types
 
 from backend.logger import logger
 from backend.services.blob_service import BlobStorageService
 from backend.services.llm_service import _generate_content_with_retry, get_client
+from backend.services.pdf_service import get_pdf_page_count, render_pdf_pages
 from backend.services.prompt_templates import get_prompt_for_doc_type
 from backend.services import filing_service
 from backend.schemas.filing_schema import FilingDocumentSchema
@@ -152,8 +152,7 @@ class ITRProcessingService:
 
         # 2. Convert PDF to images in-memory
         try:
-            pdf_doc = fitz.open(stream=file_bytes, filetype="pdf")
-            total_pages = len(pdf_doc)
+            total_pages = await get_pdf_page_count(file_bytes)
         except Exception as e:
             logger.error(f"Failed to open PDF {file_name}: {e}")
             SessionManager.update_progress(session_id, file_hash, 0, 1, status="error")
@@ -178,23 +177,19 @@ class ITRProcessingService:
         if not pages_to_process:
             logger.info(f"All {total_pages} pages for {doc_type} already extracted. Skipping.")
             SessionManager.update_progress(session_id, file_hash, total_pages, total_pages, status="completed")
-            pdf_doc.close()
             return
 
         SessionManager.update_progress(session_id, file_hash, len(existing_pages), total_pages, status="extracting")
 
         # 5. Process remaining pages
+        rendered_pages = await render_pdf_pages(file_bytes, pages_to_process, dpi=200)
         tasks = []
-        for i in pages_to_process:
-            page = pdf_doc[i]
-            pix = page.get_pixmap(dpi=200)
-            img_bytes = pix.tobytes("png")
+        for i, img_bytes in rendered_pages:
             tasks.append(
                 cls._process_single_page(session_id, user_id, ay, doc_type,
                                          file_hash, i, total_pages, img_bytes))
 
         await asyncio.gather(*tasks)
-        pdf_doc.close()
 
     @classmethod
     async def _process_single_page(cls, session_id: str, user_id: str, ay: str,

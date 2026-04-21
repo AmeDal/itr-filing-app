@@ -1,20 +1,14 @@
 import asyncio
 from typing import List, Optional, Tuple
 
-import fitz
 import google.genai as genai
 from google.genai import types
 from google.genai.errors import APIError
 
 from backend.logger import logger
+from backend.services.pdf_service import extract_pdf_payload
 from backend.schemas.extraction_schema import AadharExtractionResponse, PanExtractionResponse
 from backend.settings import get_settings
-
-PDF_TEXT_THRESHOLD = 50
-
-
-class PDFPasswordRequired(Exception):
-    """Raised when a PDF is encrypted and requires a password."""
 
 
 def get_client() -> genai.Client:
@@ -22,50 +16,27 @@ def get_client() -> genai.Client:
     return genai.Client(api_key=settings.gemini_api_key)
 
 
-def get_pdf_content(image_bytes: bytes,
-                    password: Optional[str] = None) -> Tuple[bool, List]:
+async def get_pdf_content(image_bytes: bytes,
+                          password: Optional[str] = None) -> Tuple[bool, List]:
     """
     Process PDF content and return whether text was extracted and content parts.
     """
-    try:
-        doc = fitz.open(stream=image_bytes, filetype="pdf")
-    except Exception as e:
-        if "encrypted" in str(e).lower():
-            raise PDFPasswordRequired("This PDF is password protected.")
-        raise e
+    contains_text, extracted_text, page_images = await extract_pdf_payload(
+        image_bytes, password)
 
-    if doc.is_encrypted:
-        if not password or not doc.authenticate(password):
-            raise PDFPasswordRequired(
-                "Invalid or missing password for encrypted PDF.")
-
-    # Extract all text from the PDF
-    all_text = ""
-    try:
-        for page in doc:
-            all_text += page.get_text()
-    except ValueError as e:
-        if "encrypted" in str(e).lower():
-            raise PDFPasswordRequired("This PDF is password protected.")
-        raise e
-
-    if len(all_text.strip()) >= PDF_TEXT_THRESHOLD:
+    if contains_text:
         logger.info(
-            f"PDF contains {len(all_text.strip())} chars of text. Using direct text extraction."
+            f"PDF contains {len(extracted_text.strip())} chars of text. Using direct text extraction."
         )
-        return True, [all_text]
+        return True, [extracted_text]
 
     logger.info(
-        f"PDF contains {len(all_text.strip())} chars. Falling back to image conversion."
+        f"PDF contains {len(extracted_text.strip())} chars. Falling back to image conversion."
     )
-    content_parts = []
-    for page in doc:
-        pix = page.get_pixmap(dpi=200)
-        png_bytes = pix.tobytes("png")
-        content_parts.append(
-            types.Part.from_bytes(data=png_bytes, mime_type="image/png"))
-
-    return False, content_parts
+    return False, [
+        types.Part.from_bytes(data=png_bytes, mime_type="image/png")
+        for png_bytes in page_images
+    ]
 
 
 async def _generate_content_with_retry(client,
@@ -104,7 +75,7 @@ async def extract_pan_data(
 
     contents = []
     if mime_type == "application/pdf":
-        _, pdf_contents = get_pdf_content(image_bytes, password)
+        _, pdf_contents = await get_pdf_content(image_bytes, password)
         contents.extend(pdf_contents)
     else:
         contents.append(
@@ -139,7 +110,7 @@ async def extract_aadhar_data(
 
     contents = []
     if mime_type == "application/pdf":
-        _, pdf_contents = get_pdf_content(image_bytes, password)
+        _, pdf_contents = await get_pdf_content(image_bytes, password)
         contents.extend(pdf_contents)
     else:
         contents.append(

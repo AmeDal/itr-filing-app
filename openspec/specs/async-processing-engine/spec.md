@@ -6,6 +6,7 @@ All document processing (PDF to image conversion and Gemini API payload preparat
 #### Scenario: Successful PDF Extraction
 - **WHEN** a valid PDF is uploaded.
 - **THEN** it is converted into 200 DPI PNG images in-memory and processed in concurrent batches of 5.
+- **AND** the PyMuPDF parsing and rasterization work MUST execute off the event-loop thread.
 
 ### Requirement: Rate-Limit Resilience
 The engine must gracefully handle 429 errors from the Gemini API by implementing an exponential backoff retry mechanism (15s, 30s, 45s).
