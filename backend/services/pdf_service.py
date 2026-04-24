@@ -28,7 +28,7 @@ def _open_pdf(file_bytes: bytes, password: Optional[str] = None) -> fitz.Documen
 
 
 def _get_pdf_page_count_sync(file_bytes: bytes) -> int:
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    doc = _open_pdf(file_bytes)
     try:
         return len(doc)
     finally:
@@ -38,7 +38,7 @@ def _get_pdf_page_count_sync(file_bytes: bytes) -> int:
 def _render_pdf_pages_sync(file_bytes: bytes,
                            page_numbers: Sequence[int],
                            dpi: int = 200) -> List[Tuple[int, bytes]]:
-    doc = fitz.open(stream=file_bytes, filetype="pdf")
+    doc = _open_pdf(file_bytes)
     try:
         rendered_pages: List[Tuple[int, bytes]] = []
         for page_index in page_numbers:
@@ -75,7 +75,7 @@ def _extract_pdf_payload_sync(
         for page in doc:
             pix = page.get_pixmap(dpi=200)
             images.append(pix.tobytes("png"))
-        return False, "", images
+        return False, all_text, images
     finally:
         doc.close()
 

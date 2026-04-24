@@ -6,7 +6,7 @@ from google.genai import types
 from google.genai.errors import APIError
 
 from backend.logger import logger
-from backend.services.pdf_service import extract_pdf_payload
+from backend.services.pdf_service import PDFPasswordRequired, extract_pdf_payload
 from backend.schemas.extraction_schema import AadharExtractionResponse, PanExtractionResponse
 from backend.settings import get_settings
 
