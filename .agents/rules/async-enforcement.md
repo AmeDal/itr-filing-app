@@ -12,7 +12,7 @@ globs: ["backend/**/*.py"]
 2. **All I/O operations** must use `await` — never call blocking I/O directly
 3. **No `time.sleep()`** — use `asyncio.sleep()` instead
 4. **No synchronous HTTP clients** — use `httpx.AsyncClient`, not `requests`
-5. **No synchronous DB drivers** — use async-compatible drivers (e.g., `asyncpg`, `aiosqlite`, `motor`)
+5. **No synchronous DB drivers** — use async-compatible drivers (e.g., PyMongo `AsyncMongoClient`, `asyncpg`, `aiosqlite`)
 
 ## Validation Checklist
 

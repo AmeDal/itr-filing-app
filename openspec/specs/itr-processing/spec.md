@@ -1,15 +1,23 @@
-## ADDED Requirements
+## Capability: ITR Processing
 
 ### Requirement: In-Memory Processing Sessions
-The system must support ephemeral, in-memory processing sessions for ITR document analysis that do not persist to long-term storage until finalized.
+The system must support ephemeral in-memory processing sessions for ITR document analysis while persisting filing metadata in MongoDB.
 
 #### Scenario: Session initiation
-- **WHEN** a user uploads ITR documents
-- **THEN** an in-memory session must be created to track the state of individual document extractions.
+- **WHEN** an authenticated user uploads ITR documents
+- **THEN** an in-memory session is created to track document/page extraction state
+- **AND** a `filing_attempts` record stores the assessment year, ITR type, and document metadata.
 
 ### Requirement: SSE Progress Tracking
-The system must provide real-time updates on document processing status via Server-Sent Events (SSE).
+The system must provide real-time document processing updates via Server-Sent Events.
 
 #### Scenario: User tracks progress
 - **WHEN** a user subscribes to the progress stream for their session
-- **THEN** the system must push updates as each document moves from `queued` to `extracting` to `completed`.
+- **THEN** the system pushes updates as documents move from `queued` to `extracting` to `completed` or failed/error.
+
+### Requirement: Owner-Scoped Processing
+Processing state and persisted filing records must be scoped to the authenticated user.
+
+#### Scenario: Cross-user session access
+- **WHEN** a different authenticated user requests another user's session stream
+- **THEN** the system does not stream that session's state.

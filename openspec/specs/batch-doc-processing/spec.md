@@ -1,22 +1,25 @@
-## ADDED Requirements
+## Capability: Batch Document Processing
 
-### Requirement: Multi-file Batch Ingestion
-The system must allow a single request to upload multiple document files (PAN, Aadhar, etc.) for processing.
+### Requirement: Multi-file ITR Document Ingestion
+The system must allow a single authenticated request to upload multiple ITR-supporting documents for one assessment year and ITR type.
 
-#### Scenario: User uploads two documents
-- **WHEN** the user selects a PAN image and an Aadhar PDF and clicks "Process All"
-- **THEN** the system should create entries for both documents in the database with status `queued` and return a unique `batch_id`.
+#### Scenario: User uploads required documents
+- **WHEN** the user submits files, `doc_types`, `ay`, and `itr_type` to `POST /api/v1/itr/upload`
+- **THEN** the system upserts a `filing_attempts` record for the authenticated user and assessment year
+- **AND** creates an in-memory processing session
+- **AND** returns a `session_id`.
 
 ### Requirement: Async Extraction Trigger
 The system must initiate document extraction in the background without blocking the ingestion response.
 
 #### Scenario: Background processing starts
-- **WHEN** the batch ingestion request is successful
-- **THEN** background tasks should be spawned to process each document using the `llm_service`.
+- **WHEN** the upload request is accepted
+- **THEN** a FastAPI background task starts `ITRProcessingService.process_session`
+- **AND** each document is processed independently so one failure does not stop the full session.
 
-### Requirement: Scoped Batch Extraction
-All document batches and their constituent documents must be bound to the authenticated user who initiated the upload.
+### Requirement: Scoped Session Extraction
+All sessions and filing attempts must be bound to the authenticated user who initiated the upload.
 
-#### Scenario: User checks batch status
-- **WHEN** a user requests the status of a `batch_id`
-- **THEN** the system must only return results if the batch was created by that specific user, ensuring cross-user data isolation.
+#### Scenario: User subscribes to session status
+- **WHEN** a user requests `GET /api/v1/itr/progress/{session_id}`
+- **THEN** the system streams progress only if the session belongs to that authenticated user.

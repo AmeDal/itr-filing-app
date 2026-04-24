@@ -11,9 +11,9 @@ globs: ["backend/**/*.py"]
 | Layer | File Pattern | Allowed | Forbidden |
 |---|---|---|---|
 | **Router** | `controllers/*_router.py` | Route definitions, HTTP status codes, call services | DB queries, business logic, data transforms |
-| **Service** | `service/*_service.py` | Business logic, orchestrate DAL calls | Route definitions, direct DB queries, HTTP formatting |
+| **Service** | `services/*_service.py` | Business logic, orchestrate DAL calls | Route definitions, direct DB queries, HTTP formatting |
 | **DAL** | `dal/*_dal.py` or `db.py` | CRUD queries, connection management | Business logic, request validation |
-| **Schema** | `schema/*_schema.py` | Pydantic request + response models | Business logic, DB queries |
+| **Schema** | `schemas/*_schema.py` | Pydantic request + response models | Business logic, DB queries |
 | **Settings** | `settings.py` | Constants, API keys, paths (via `.env`) | Business logic, routes |
 
 ## Violations to Flag
@@ -21,7 +21,7 @@ globs: ["backend/**/*.py"]
 | If you see... | It belongs in... |
 |---|---|
 | SQL/ORM query in a router | `dal/` or `db.py` |
-| `if/else` business logic in a router | `service/` |
+| `if/else` business logic in a router | `services/` |
 | `@router.get` in a service file | `controllers/` |
-| Data transformation in DAL | `service/` |
+| Data transformation in DAL | `services/` |
 | Hardcoded API key anywhere | `settings.py` via `.env` |
