@@ -1,128 +1,168 @@
-import logging
-from contextlib import asynccontextmanager
+import hashlib
+from typing import Optional
 
-import aiosqlite
-
-from backend.settings import get_settings
+from bson import ObjectId
+from motor.motor_asyncio import AsyncIOMotorClient
 
 from backend.logger import logger
+from backend.security import hash_password
+from backend.services.crypto_service import CryptoService
+from backend.settings import get_settings
+from backend.utils import mask_uri, now_ist
 
-# Schema Definitions
-USERS_TABLE_DDL = """
-CREATE TABLE IF NOT EXISTS users (
-    user_id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    full_name  TEXT    NOT NULL,
-    pan_number TEXT    NOT NULL UNIQUE 
-                      CHECK(length(pan_number) = 10),
-    aadhar_number TEXT UNIQUE 
-                      CHECK(aadhar_number IS NULL OR length(aadhar_number) = 12),
-    email      TEXT   UNIQUE,
-    dob        TEXT,
-    father_name TEXT,
-    gender     TEXT   CHECK(gender IS NULL OR gender IN ('MALE','FEMALE','OTHER')),
-    address_line TEXT,
-    pincode    TEXT   CHECK(pincode IS NULL OR length(pincode) = 6),
-    status     TEXT   NOT NULL DEFAULT 'active'
-                      CHECK(status IN ('active','inactive','suspended')),
-    created_at TEXT   NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT   NOT NULL DEFAULT (datetime('now'))
-) STRICT;
-"""
 
-DOCUMENTS_TABLE_DDL = """
-CREATE TABLE IF NOT EXISTS documents (
-    id             TEXT    PRIMARY KEY,
-    batch_id       TEXT    NOT NULL,
-    user_id        INTEGER,
-    doc_type       TEXT    NOT NULL
-                          CHECK(doc_type IN ('PAN','AADHAR')),
-    status         TEXT    NOT NULL DEFAULT 'queued'
-                          CHECK(status IN ('queued','extracting','completed','error')),
-    extracted_data TEXT,
-    error_message  TEXT,
-    created_at     TEXT    NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-) STRICT;
-"""
+def generate_oid(first_name: str, middle_name: str, last_name: str,
+                 pan_number: str, aadhar_number: str, aadhar_pincode: str,
+                 mobile_number: str, email: str) -> ObjectId:
+    """
+    Generates a deterministic BSON ObjectId from core identity fields.
 
-AUDIT_LOG_TABLE_DDL = """
-CREATE TABLE IF NOT EXISTS user_audit_log (
-    log_id     INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id    INTEGER NOT NULL,
-    field_name TEXT    NOT NULL,
-    old_value  TEXT,
-    new_value  TEXT,
-    changed_at TEXT    NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (user_id) REFERENCES users(user_id)
-) STRICT;
-"""
+    The input fields are normalized (trimmed and case-adjusted where appropriate)
+    and concatenated into a single string. A 12-byte BLAKE2b hash is then computed
+    and used directly as the binary value for the ObjectId.
 
-INDEXES_DDL = [
-    "CREATE INDEX IF NOT EXISTS idx_users_pan ON users(pan_number);",
-    "CREATE INDEX IF NOT EXISTS idx_documents_batch ON documents(batch_id);",
-    "CREATE INDEX IF NOT EXISTS idx_audit_user ON user_audit_log(user_id);"
-]
+    Note:
+    The resulting ObjectId is deterministic: identical input data will always
+    produce the same ObjectId.
+    """
+    data = "|".join([
+        first_name.strip().lower(),
+        middle_name.strip().lower(),
+        last_name.strip().lower(),
+        pan_number.strip().upper(),
+        aadhar_number.strip(),
+        aadhar_pincode.strip(),
+        mobile_number.strip(),
+        email.strip().lower()
+    ])
+    full_hash = hashlib.blake2b(data.encode('utf-8'), digest_size=12).digest()
+    return ObjectId(full_hash)
+
 
 class DatabaseManager:
-    _db_path = None
+    """
+    Singleton manager for MongoDB connection using Motor.
+    Obsessively async and lifespan-safe.
+    """
+    client: Optional[AsyncIOMotorClient] = None
+    db = None
 
     @classmethod
     async def initialize(cls):
-        """Startup initialization: creates tables and runs integrity checks."""
+        """
+        Connects to MongoDB and performs startup tasks like indexing and seeding.
+        Should be called in the FastAPI lifespan startup.
+        """
+        if cls.client is not None:
+            logger.warning("DatabaseManager already initialized.")
+            return
+
         settings = get_settings()
-        cls._db_path = settings.db_path
-        
-        logger.info(f"Initializing database at {cls._db_path}")
-        
-        async with cls.get_db() as db:
-            # Drop legacy tables if they exist (Renaming taxpayers -> users)
-            cursor = await db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='taxpayers'")
-            if await cursor.fetchone():
-                logger.warning("Legacy table 'taxpayers' found. Dropping it to migrate to 'users'.")
-                await db.execute("DROP TABLE taxpayers")
-            
-            # Since we are overhauling even the valid documents table to STRICT and adding user_id
-            await db.execute("DROP TABLE IF EXISTS documents")
+        masked_uri = mask_uri(settings.mongo_uri)
+        logger.info(f"Connecting to MongoDB at {masked_uri}")
 
-            # Enable Foreign Keys & Write-Ahead Logging
-            await db.execute("PRAGMA foreign_keys = ON")
-            await db.execute("PRAGMA journal_mode = WAL")
-            
-            # Integrity Check
-            cursor = await db.execute("PRAGMA integrity_check")
-            result = await cursor.fetchone()
-            if result[0] != "ok":
-                logger.error(f"Database integrity check failed: {result[0]}")
-                raise RuntimeError("Database integrity check failed")
+        try:
+            cls.client = AsyncIOMotorClient(settings.mongo_uri)
+            cls.db = cls.client[settings.mongo_db_name]
 
-            # Create Tables
-            await db.execute(USERS_TABLE_DDL)
-            await db.execute(DOCUMENTS_TABLE_DDL)
-            await db.execute(AUDIT_LOG_TABLE_DDL)
-            
-            # Create Indexes
-            for index_sql in INDEXES_DDL:
-                await db.execute(index_sql)
-            
-            await db.commit()
+            # Verify connection with a ping
+            await cls.client.admin.command('ping')
+            logger.info("Successfully connected to MongoDB")
+
+            # Initialize CryptoService for CSFLE
+            CryptoService.initialize(
+                mongo_uri=settings.mongo_uri,
+                master_key_b64=settings.csfle_master_key,
+                key_vault_namespace=settings.csfle_key_vault_namespace
+            )
+
+            # Perform indexing and seeding
+            await cls._ensure_indexes()
+            await cls._seed_admin_user()
+
             logger.info("Database initialization complete.")
+        except Exception as e:
+            logger.error(f"Critical error during database initialization: {e}")
+            raise e
 
     @classmethod
-    @asynccontextmanager
-    async def get_db(cls):
-        """Async context manager for database connections."""
-        if cls._db_path is None:
-            cls._db_path = get_settings().db_path
-            
-        db = await aiosqlite.connect(cls._db_path)
-        db.row_factory = aiosqlite.Row
-        try:
-            await db.execute("PRAGMA foreign_keys = ON")
-            yield db
-        finally:
-            await db.close()
+    async def _ensure_indexes(cls):
+        """Ensures required indexes exist."""
+        await cls.db.users.create_index("pan_number", unique=True)
+        await cls.db.users.create_index("email", unique=True, sparse=True)
+        await cls.db.filing_attempts.create_index([("user_id", 1), ("assessment_year", 1)], unique=True)
 
-@asynccontextmanager
-async def get_db_connection():
-    async with DatabaseManager.get_db() as db:
-        yield db
+    @classmethod
+    async def _seed_admin_user(cls):
+        """Seeds the initial administrative user if not exists."""
+        settings = get_settings()
+        seed_data = settings.get_seed_user_dict()
+
+        identity_fields = {
+            k: v
+            for k, v in seed_data.items() if k not in ("password", "role", "is_active")
+        }
+        user_id = generate_oid(**identity_fields)
+
+        existing = await cls.db.users.find_one({"_id": user_id})
+        if not existing:
+            logger.info(f"Seeding initial user with _id: {user_id}")
+            seed_data = seed_data.copy()
+
+            # Encrypt identity fields deterministically
+            identity_fields_to_encrypt = [
+                "first_name", "middle_name", "last_name", "pan_number",
+                "aadhar_number", "aadhar_pincode", "mobile_number", "email"
+            ]
+            for field in identity_fields_to_encrypt:
+                if field in seed_data and seed_data[field]:
+                    seed_data[field] = await CryptoService.encrypt_deterministic(seed_data[field])
+
+            plain_pwd = seed_data["password"]
+            hashed_pwd = hash_password(plain_pwd)
+            seed_data["password"] = await CryptoService.encrypt_random(hashed_pwd)
+
+            user_doc = {
+                "_id": user_id,
+                **seed_data,
+                "role": await CryptoService.encrypt_deterministic(seed_data.get("role", "admin")),
+                "is_active": await CryptoService.encrypt_deterministic(seed_data.get("is_active", True)),
+                "created_at": now_ist(),
+                "updated_at": None
+            }
+            await cls.db.users.insert_one(user_doc)
+        else:
+            # Migration: ensure existing seed user has role and is_active
+            if "role" not in existing or "is_active" not in existing:
+                logger.info(f"Updating seed user {user_id} with role/is_active")
+                await cls.db.users.update_one(
+                    {"_id": user_id},
+                    {"$set": {
+                        "role": await CryptoService.encrypt_deterministic(seed_data.get("role", "admin")),
+                        "is_active": await CryptoService.encrypt_deterministic(seed_data.get("is_active", True))
+                    }}
+                )
+            logger.debug("Seed user already exists.")
+
+    @classmethod
+    def get_db(cls):
+        """Returns the database instance. Raises RuntimeError if not initialized."""
+        if cls.db is None:
+            raise RuntimeError(
+                "DatabaseManager not initialized. Call initialize() first.")
+        return cls.db
+
+    @classmethod
+    async def close(cls):
+        """Closes the MongoDB connection."""
+        CryptoService.close()
+        if cls.client:
+            cls.client.close()
+            cls.client = None
+            cls.db = None
+            logger.info("MongoDB connection closed.")
+
+
+async def get_db():
+    """FastAPI dependency for obtaining the database instance."""
+    return DatabaseManager.get_db()

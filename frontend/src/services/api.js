@@ -1,145 +1,153 @@
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
+
+export const API_BASE_URL = 'http://localhost:8000/api/v1';
+
+let accessToken = null;
+let refreshCallback = null;
+
+export const setApiAuth = (token, onRefresh) => {
+  accessToken = token;
+  refreshCallback = onRefresh;
+};
+
+const fetchWithAuth = async (url, options = {}) => {
+  const headers = { ...options.headers };
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+
+  const mergedOptions = {
+    ...options,
+    headers,
+    credentials: 'include', // Ensure refresh cookie is sent
+  };
+
+  let response = await fetch(url, mergedOptions);
+
+  if (response.status === 401 && refreshCallback) {
+    // Attempt refresh
+    const newToken = await refreshCallback();
+    if (newToken) {
+      accessToken = newToken;
+      headers['Authorization'] = `Bearer ${accessToken}`;
+      response = await fetch(url, { ...mergedOptions, headers });
+    }
+  }
+
+  return response;
+};
 
 export const apiService = {
-  /**
-   * Extract data from a document image
-   * @param {File} file - The image file to process
-   * @param {string} docType - 'PAN' or 'AADHAR'
-   * @param {string|null} password - Optional PDF password
-   * @returns {Promise<Object>} - Extracted data
-   */
-  async extractDocument(file, docType = 'PAN', password = null) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('doc_type', docType);
-    if (password) formData.append('password', password);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/extract/document`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('We are unable to process your document at this time. Please try again later.');
-      }
-
-      return response.json();
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      throw err;
+  async signup(userData) {
+    const response = await fetch(`${API_BASE_URL}/users/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(userData),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.detail || 'Signup failed');
     }
+    return response.json();
   },
 
-  /**
-   * Create a new taxpayer profile
-   * @param {Object} data - Taxpayer data
-   * @returns {Promise<Object>}
-   */
-  async createTaxpayer(data) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/taxpayers/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('We are unable to process your request at this time. Please try again later.');
-      }
-
-      return response.json();
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      throw err;
+  async uploadDocuments(formData) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/itr/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.detail || 'Upload failed');
     }
+    return response.json();
   },
 
-  /**
-   * Link Aadhar to an existing PAN profile
-   * @param {string} panNumber - The PAN number
-   * @param {Object} data - Aadhar data
-   * @returns {Promise<Object>}
-   */
-  async linkAadhar(panNumber, data) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/taxpayers/${panNumber}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        throw new Error('We are unable to process your request at this time. Please try again later.');
-      }
-
-      return response.json();
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      throw err;
-    }
-  },
-
-  /**
-   * Start a batch extraction process
-   * @param {File[]} files - List of files
-   * @param {string[]} docTypes - List of doc types
-   * @param {Array<string|null>} passwords - List of passwords
-   * @returns {Promise<Object>}
-   */
-  async extractBatch(files, docTypes, passwords = []) {
-    const formData = new FormData();
-    files.forEach(file => formData.append('files', file));
+  connectProgressStream(sessionId, onMessage, onError) {
+    const ctrl = new AbortController();
     
-    // Send docTypes and passwords as JSON strings for robust parsing
-    formData.append('doc_types', JSON.stringify(docTypes));
-    formData.append('passwords', JSON.stringify(passwords));
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/extract/batch`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || 'Batch extraction failed to start.');
+    fetchEventSource(`${API_BASE_URL}/itr/progress/${sessionId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      credentials: 'include',
+      signal: ctrl.signal,
+      async onopen(response) {
+        if (!response.ok) {
+          throw new Error('SSE connection failed');
+        }
+      },
+      onmessage(msg) {
+        if (msg.data) {
+          try {
+            onMessage(JSON.parse(msg.data));
+          } catch (e) {
+            console.error('SSE JSON error', e);
+          }
+        }
+      },
+      onerror(err) {
+        onError(err);
+        ctrl.abort();
       }
+    });
 
-      return response.json();
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      throw err;
-    }
+    return () => ctrl.abort();
   },
 
-  /**
-   * Get the status of a batch extraction
-   * @param {string} batchId - The batch ID
-   * @returns {Promise<Object>}
-   */
-  async getBatchStatus(batchId) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/extract/status/${batchId}`);
+  // Admin endpoints
+  async listUsers(skip = 0, limit = 100) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users?skip=${skip}&limit=${limit}`);
+    if (!response.ok) throw new Error('Failed to fetch users');
+    return response.json();
+  },
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch extraction status.');
-      }
+  async deleteUser(userId) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/${userId}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Delete failed');
+    return response.json();
+  },
 
-      return response.json();
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new Error('Network error. Please check your connection and try again.');
-      }
-      throw err;
-    }
+  async bulkDeleteUsers(userIds) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_ids: userIds })
+    });
+    if (!response.ok) throw new Error('Bulk delete failed');
+    return response.json();
+  },
+
+  async resetPassword(userId, newPassword) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/admin/users/${userId}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ new_password: newPassword })
+    });
+    if (!response.ok) throw new Error('Password reset failed');
+    return response.json();
+  },
+
+  async getFilingHistory() {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history`);
+    if (!response.ok) throw new Error('Failed to fetch filing history');
+    return response.json();
+  },
+
+  async getFilingDetail(ay) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history/${ay}`);
+    if (!response.ok) throw new Error('Failed to fetch filing details');
+    return response.json();
+  },
+
+  async deleteDocument(ay, docType) {
+    const response = await fetchWithAuth(`${API_BASE_URL}/filing/history/${ay}/${docType}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) throw new Error('Failed to delete document');
+    return response.json();
   }
 };

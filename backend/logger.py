@@ -2,6 +2,7 @@ import logging
 import sys
 from pathlib import Path
 
+
 def setup_logger(name: str = "backend") -> logging.Logger:
     logger = logging.getLogger(name)
     logger.setLevel(logging.DEBUG)
@@ -28,6 +29,7 @@ def setup_logger(name: str = "backend") -> logging.Logger:
 
     logger.addHandler(console)
     logger.addHandler(file_handler)
+
     return logger
 
 # Initialize default logger

@@ -1,37 +1,47 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.db import DatabaseManager
-from backend.controllers.extraction_router import router as extraction_router
+from backend.controllers.admin_router import router as admin_router
+from backend.controllers.itr_router import router as itr_router
 from backend.controllers.user_router import router as user_router
+from backend.controllers.filing_router import router as filing_router
+from backend.db import DatabaseManager
+from backend.services.blob_service import BlobStorageService
+from backend.settings import get_settings
+
+settings = get_settings()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
+    # Startup: Initialize DB and connections
     await DatabaseManager.initialize()
     yield
-    # Shutdown
-    pass
+    # Shutdown: Close DB and cleanup
+    await DatabaseManager.close()
+    await BlobStorageService.close()
 
 
-app = FastAPI(title="ITR Filing App", lifespan=lifespan)
+app = FastAPI(
+    title="ITR Filing App",
+    description="Production-grade ITR Filing Application with Async MongoDB",
+    lifespan=lifespan
+)
+api_router = APIRouter(prefix="/api")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.include_router(extraction_router, prefix="/api")
-app.include_router(user_router, prefix="/api")
-
-
-@app.get("/api/v1/health")
-async def health_check():
-    return {"status": "ok"}
-
+# Route registration
+api_router.include_router(user_router)
+api_router.include_router(itr_router)
+api_router.include_router(filing_router)
+api_router.include_router(admin_router)
+app.include_router(api_router)
