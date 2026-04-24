@@ -1,36 +1,39 @@
-## ADDED Requirements
+## Capability: User Auth
 
-### Requirement: Deterministic User OID Generation
-The system must generate a unique, deterministic 64-character hex ID (SHA-256) for every user based on their core identity fields.
+### Requirement: Deterministic User ObjectId Generation
+The system must generate a deterministic BSON ObjectId for every user based on normalized core identity fields.
 
 #### Scenario: User provides unique details
-- **WHEN** a user provides their First Name, Middle Name, Last Name, PAN, Aadhar, Pincode, Mobile, Email, and Password
-- **THEN** the system should concatenate these identity fields (excluding password) with a "|" delimiter, convert to lowercase/uppercase as specified, and return the SHA-256 hash.
+- **WHEN** a user provides first name, middle name, last name, PAN, Aadhar, pincode, mobile, email, and password
+- **THEN** the system concatenates the identity fields excluding password with `|`
+- **AND** normalizes names/email to lowercase, PAN to uppercase, and numeric fields by trimming
+- **AND** computes a 12-byte BLAKE2b digest used as the BSON ObjectId bytes.
 
 ### Requirement: Secure Unified Signup
-The system must allow a user to create a profile by Providing all identity details in a single atomic operation.
+The system must allow a user to create a profile by providing all identity details in a single request.
 
 #### Scenario: Valid signup processing
-- **WHEN** the signup request is received with all 9 mandatory fields (including password)
-- **THEN** the system should compute the OID, check for existing PAN/Email conflicts, and save the record to MongoDB with a `created_at` timestamp in IST.
+- **WHEN** the signup request is received with valid mandatory fields
+- **THEN** the system computes the deterministic ObjectId, checks encrypted PAN/email conflicts, hashes and encrypts the password, encrypts PII fields, and saves the user with an IST `created_at` timestamp.
 
 ### Requirement: Strict Input Validation
-The system must enforce specific formats for identity fields on both the frontend and backend.
+The system must enforce specific formats for identity fields on the backend and frontend.
 
-- **PAN**: 10 characters, Alphanumeric (5 letters, 4 digits, 1 letter).
-- **Aadhar**: 12 digits precisely.
-- **Mobile**: 10 digits precisely.
-- **Pincode**: 6 digits precisely.
-- **Password**: Minimum 8 characters.
+- **PAN**: 10 characters, 5 uppercase letters, 4 digits, 1 uppercase letter.
+- **Aadhar**: exactly 12 digits.
+- **Mobile**: exactly 10 digits.
+- **Pincode**: exactly 6 digits.
+- **Password**: at least 12 characters with uppercase, lowercase, digit, and one allowed special character.
 
 #### Scenario: User provides malformed identity data
-- **WHEN** a user enters a 9-character PAN or an 11-digit Aadhar number
-- **THEN** the system must prevent submission and display a field-specific error message.
+- **WHEN** a user enters malformed identity data or a weak password
+- **THEN** the system prevents successful signup and returns field-specific validation errors.
 
 ### Requirement: Tokenized Login Response
-The system must verify credentials and return JWT tokens upon success.
+The system must verify PAN/password credentials and return an access token upon success.
 
 #### Scenario: Successful login
-- **WHEN** a user provides a valid PAN and their matching password
-- **THEN** the response must conform to the `AuthResponse` schema, containing tokens and a user summary, and securely set the refresh cookie.
-
+- **WHEN** a user submits valid OAuth2 form credentials using PAN as `username`
+- **THEN** the response conforms to `AuthResponse`
+- **AND** includes an access token and user summary
+- **AND** securely sets the refresh token cookie.

@@ -1,72 +1,54 @@
-## ADDED Requirements
+## Capability: CSFLE Field Encryption
 
-### Requirement: CSFLE master key loading
-The application SHALL load a 96-byte master key from the `CSFLE_MASTER_KEY` environment variable (base64-encoded) on startup. If the key is absent or invalid, startup SHALL fail with a clear error message.
+### Requirement: CSFLE Master Key Loading
+The application SHALL load a 96-byte master key from the `CSFLE_MASTER_KEY` environment variable as a base64-encoded value.
 
 #### Scenario: Valid master key present
-- **WHEN** `CSFLE_MASTER_KEY` is set to a valid base64 string decoding to exactly 96 bytes
-- **THEN** `CryptoService.initialize()` completes without error and the key is stored in memory
+- **WHEN** `CSFLE_MASTER_KEY` decodes to exactly 96 bytes
+- **THEN** `CryptoService.initialize()` completes and creates a `ClientEncryption` instance.
 
-#### Scenario: Master key missing
-- **WHEN** `CSFLE_MASTER_KEY` is empty or not set in `.env`
-- **THEN** application startup raises `ValueError` with message indicating the key is required
+#### Scenario: Master key missing or invalid
+- **WHEN** `CSFLE_MASTER_KEY` is empty, not base64, or not exactly 96 bytes
+- **THEN** startup raises a clear `ValueError`.
 
-#### Scenario: Master key wrong length
-- **WHEN** `CSFLE_MASTER_KEY` decodes to a byte string that is not exactly 96 bytes
-- **THEN** application startup raises `ValueError` indicating the expected length
+### Requirement: Data Encryption Key (DEK) Lifecycle
+The system SHALL create or retrieve a single DEK identified by altName `itr-password-dek` in the configured key vault namespace.
 
----
+#### Scenario: First startup
+- **WHEN** no DEK with altName `itr-password-dek` exists
+- **THEN** `CryptoService.initialize()` creates it and caches its ID.
 
-### Requirement: Data Encryption Key (DEK) lifecycle
-The system SHALL create or retrieve a single DEK identified by altName `"itr-password-dek"` in the `encryption.__keyVault` collection on startup. DEK creation SHALL be idempotent.
+#### Scenario: Subsequent startup
+- **WHEN** the DEK already exists
+- **THEN** `CryptoService.initialize()` reuses it without creating a duplicate.
 
-#### Scenario: First startup — DEK does not exist
-- **WHEN** no DEK with altName `"itr-password-dek"` exists in the key vault
-- **THEN** `CryptoService.initialize()` creates a new DEK and caches its ID
-
-#### Scenario: Subsequent startup — DEK already exists
-- **WHEN** a DEK with altName `"itr-password-dek"` already exists in the key vault
-- **THEN** `CryptoService.initialize()` retrieves the existing DEK ID and caches it (no duplicate created)
-
----
-
-### Requirement: Field encryption on write
-The system SHALL encrypt the Argon2 `hashed_password` string using `AEAD_AES_256_CBC_HMAC_SHA_512-Random` before inserting or updating any user document in MongoDB.
+### Requirement: Field Encryption on Write
+The system SHALL encrypt sensitive user fields before inserting or updating user documents in MongoDB.
 
 #### Scenario: User created via signup
 - **WHEN** `create_user()` is called with a valid plaintext password
-- **THEN** the password is first hashed with Argon2, then the hash is encrypted, and the resulting Binary is stored in the `hashed_password` field; no plaintext hash is stored
+- **THEN** the password is Argon2-hashed off the event loop
+- **AND** the hash is encrypted with random CSFLE into the `password` field
+- **AND** identity fields, `role`, and `is_active` are encrypted deterministically for exact-match queries.
 
 #### Scenario: Seed user inserted at startup
-- **WHEN** the seed user does not yet exist and `_seed_admin_user()` runs
-- **THEN** the seed password is hashed then encrypted before insertion into MongoDB
+- **WHEN** `_seed_admin_user()` creates the seed user
+- **THEN** the seed password is hashed and encrypted before insertion.
 
-#### Scenario: Inspecting MongoDB document directly
-- **WHEN** a document in the `users` collection is read without decryption (e.g., via Atlas UI)
-- **THEN** the `hashed_password` field contains a BSON Binary subtype 6 value (not the Argon2 hash string)
-
----
-
-### Requirement: Field decryption on read
-The system SHALL decrypt the `hashed_password` Binary field before passing it to `verify_password()` during login.
+### Requirement: Field Decryption on Read
+The system SHALL decrypt encrypted fields before validation or API serialization.
 
 #### Scenario: Login with correct password
-- **WHEN** `login_user()` is called with a valid PAN and correct plaintext password
-- **THEN** `hashed_password` is decrypted to the Argon2 hash, `verify_password()` returns True, and `UserResponse` is returned
+- **WHEN** `login_user()` finds a user by deterministically encrypted PAN
+- **THEN** `password` is decrypted to the Argon2 hash and verified off the event loop.
 
-#### Scenario: Login with wrong password
-- **WHEN** `login_user()` is called with a valid PAN and incorrect plaintext password
-- **THEN** `hashed_password` is decrypted, `verify_password()` returns False, and `None` is returned
+#### Scenario: Protected request
+- **WHEN** `get_current_user()` loads a user document
+- **THEN** encrypted `is_active` is decrypted before allowing access.
 
----
+### Requirement: Password Field Not Exposed
+The system SHALL never include `password` in API responses.
 
-### Requirement: Password field not exposed in API responses
-The system SHALL never include `password` or `hashed_password` in any API response to the client.
-
-#### Scenario: Signup response
-- **WHEN** `POST /api/users/signup` succeeds
-- **THEN** the JSON response contains user identity fields but no `password` or `hashed_password` key
-
-#### Scenario: Login response
-- **WHEN** `POST /api/users/login` succeeds
-- **THEN** the JSON response contains user identity fields but no `password` or `hashed_password` key
+#### Scenario: Signup or login response
+- **WHEN** a user receives a profile or auth response
+- **THEN** the JSON response contains no `password` key.

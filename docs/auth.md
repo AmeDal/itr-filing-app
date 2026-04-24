@@ -1,7 +1,7 @@
 # Authentication & Authorization Architecture
 
 > **Scope**: JWT-based auth with role-based access control (RBAC) for the ITR Filing App.
-> **Last updated**: 2026-04-19
+> **Last updated**: 2026-04-24
 
 ---
 
@@ -24,12 +24,13 @@
 
 ## 1. Overview
 
-The app uses a **stateless JWT** access/refresh token pair with the following properties:
+The app uses a JWT access/refresh token pair with the following properties:
 
-- **Access token**: short-lived (30 min), sent as `Authorization: Bearer` header
-- **Refresh token**: long-lived (7 days), stored as `HttpOnly; Secure; SameSite=Strict` cookie
-- **Roles**: `admin` | `user` — stored in Mongo `users.role`, included in access token claims
-- **Session survival**: page refresh triggers a silent `/users/refresh` call using the cookie
+- **Access token**: short-lived, configurable by `ACCESS_TOKEN_EXPIRE_MINUTES`, sent as `Authorization: Bearer`
+- **Refresh token**: configurable by `REFRESH_TOKEN_EXPIRE_DAYS`, stored as a path-scoped `HttpOnly` cookie
+- **Roles**: `admin` | `user` — stored encrypted in Mongo `users.role`, included in access token claims
+- **Session survival**: page refresh triggers a silent `POST /api/v1/users/refresh` call using the cookie
+- **Branch policy for agent work**: PRs target `development` unless the user explicitly asks otherwise
 
 ```mermaid
 sequenceDiagram
@@ -39,21 +40,22 @@ sequenceDiagram
     participant DB as MongoDB
 
     Browser->>SPA: Navigate to /
-    SPA->>API: POST /users/login {pan, password}
-    API->>DB: Find user by PAN, verify password
-    API-->>SPA: 200 {access_token, user} + Set-Cookie: refresh_token (HttpOnly)
+    SPA->>API: POST /api/v1/users/login {username: PAN, password}
+    API->>DB: Find encrypted PAN, decrypt hash, verify password
+    API-->>SPA: 200 {access_token, user} + Set-Cookie: refresh_token
     SPA->>SPA: Store access_token in React state
 
     Note over SPA: Subsequent API calls
-    SPA->>API: GET /itr/... [Authorization: Bearer access_token]
-    API->>API: Decode JWT, verify exp/typ/is_active
+    SPA->>API: GET /api/v1/filing/history [Authorization: Bearer access_token]
+    API->>API: Decode JWT, check jti/typ/exp
+    API->>DB: Load user and verify encrypted is_active
     API-->>SPA: 200 response
 
     Note over SPA: Token expired
-    SPA->>API: GET /itr/... [Authorization: Bearer expired_token]
+    SPA->>API: Protected request with expired access_token
     API-->>SPA: 401 Unauthorized
-    SPA->>API: POST /users/refresh (cookie sent automatically)
-    API->>API: Verify refresh JWT from cookie, rotate tokens
+    SPA->>API: POST /api/v1/users/refresh (cookie sent automatically)
+    API->>API: Verify refresh JWT, revoke old refresh token, issue new pair
     API-->>SPA: 200 {access_token} + Set-Cookie: new_refresh_token
     SPA->>SPA: Retry original request with new access_token
 ```
@@ -90,45 +92,46 @@ sequenceDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Login: POST /users/login
+    [*] --> Login: POST /api/v1/users/login
     Login --> Active: Issue access + refresh pair
     Active --> Expired: access_token exp reached
-    Expired --> Refreshed: POST /users/refresh (cookie)
-    Refreshed --> Active: New access + rotated refresh
-    Active --> Revoked: POST /users/logout
-    Revoked --> [*]: Tokens blocklisted
-    Expired --> LoggedOut: Refresh also expired/blocked
+    Expired --> Refreshed: POST /api/v1/users/refresh
+    Refreshed --> Active: Revoke old refresh, issue new pair
+    Active --> Revoked: POST /api/v1/users/logout
+    Revoked --> [*]: Access/refresh jti values blocklisted
+    Expired --> LoggedOut: Refresh missing, expired, or blocked
     LoggedOut --> [*]: Redirect to login
 ```
 
 ### Key Rules
 
-1. **Never put PII in tokens** — only `sub` (ObjectId string) and `role`
-2. **Mandatory refresh rotation** — each refresh invalidates the old `jti` and issues a new pair
-3. **Blocklist check** — every token decode checks `jti` against the blocklist before proceeding
-4. **`is_active` check** — even with a valid token, the DB user must have `is_active=True`
+1. **Never put PII in tokens** — only `sub`, `role`, `typ`, `iat`, `exp`, and `jti`
+2. **Refresh rotation** — each refresh revokes the previous refresh token and returns a new access/refresh pair
+3. **Blocklist check** — every token decode checks `jti` against the in-memory blocklist
+4. **`is_active` check** — every protected request reloads the user and decrypts `is_active`
 
 ---
 
 ## 3. Token Transport & Storage
 
-| Token | Transport | Storage | XSS-safe? | CSRF-safe? |
-|-------|-----------|---------|-----------|------------|
-| Access | `Authorization: Bearer` header | React state (memory) | ✅ Cannot persist across XSS | N/A (not auto-sent) |
-| Refresh | `Set-Cookie: HttpOnly; Secure; SameSite=Strict; Path=/api/v1/users/refresh` | Browser cookie jar | ✅ HttpOnly blocks JS access | ✅ SameSite=Strict + Path scoping |
+| Token | Transport | Storage | Notes |
+|-------|-----------|---------|-------|
+| Access | `Authorization: Bearer` header | React state/module memory | Not persisted to `localStorage`; active XSS remains high impact |
+| Refresh | `Set-Cookie` from API | Browser cookie jar | `HttpOnly`, path-scoped to `/api/v1/users/refresh`; `Secure` + `SameSite=Strict` in production, `SameSite=Lax` in debug |
 
 ### Why this combination?
 
-- **Access in memory**: XSS cannot exfiltrate it from a JSON response after it's stored in React state. It's re-attached manually to each request header.
-- **Refresh in HttpOnly cookie**: Even if XSS occurs, the attacker cannot read the refresh token. The `SameSite=Strict` flag prevents CSRF because the cookie is only sent on same-site navigations, never cross-origin.
-- **Path-scoped cookie**: The refresh cookie is scoped to `/api/v1/users/refresh` only, so it's never sent with other API requests — minimizing exposure surface.
+- **Access in memory**: avoids durable browser storage for bearer credentials.
+- **Refresh in HttpOnly cookie**: JavaScript cannot read the refresh token directly.
+- **Path-scoped cookie**: the refresh cookie is only sent to `/api/v1/users/refresh`.
+- **Refresh rotation**: a stolen older refresh token is invalid after successful rotation.
 
 ### CORS Requirement
 
 For `credentials: 'include'` to work:
-- `Access-Control-Allow-Origin` **must not** be `*` — use specific origin(s)
+- `Access-Control-Allow-Origin` must use explicit origins, not `*`
 - `Access-Control-Allow-Credentials` must be `true`
-- Configured via `cors_allowed_origins` in `settings.py` and `CORS_ALLOWED_ORIGINS` in `.env`.
+- Origins are configured via `cors_allowed_origins` in `backend/settings.py`
 
 ---
 
@@ -139,13 +142,14 @@ For `credentials: 'include'` to work:
 ```mermaid
 graph TD
     A["oauth2_scheme<br/>(OAuth2PasswordBearer)"] --> B["get_current_user"]
-    B --> C["Decode JWT (PyJWT)"]
+    B --> C["decode_token()"]
     C --> D["Check jti not blocklisted"]
-    D --> E["Load user from DB"]
-    E --> F["Verify is_active"]
-    F --> G["Return UserPrincipal"]
-    G --> H["require_admin"]
-    H --> I["Check role == admin"]
+    D --> E["Verify typ == access"]
+    E --> F["Load user from Mongo"]
+    F --> G["Decrypt is_active"]
+    G --> H["Return UserPrincipal(id, role)"]
+    H --> I["require_admin"]
+    I --> J["Check role == admin"]
 ```
 
 ### `UserPrincipal` (lightweight auth identity)
@@ -153,11 +157,11 @@ graph TD
 ```python
 @dataclass
 class UserPrincipal:
-    id: str      # ObjectId string (from JWT sub)
-    role: str    # "admin" | "user"
+    id: str
+    role: str
 ```
 
-This is deliberately minimal — it's not a full user document. The access token carries `sub` and `role`, which are verified against the DB on every request (to catch deactivated users).
+This is deliberately minimal. For full user details, services reload and decrypt the user document.
 
 ---
 
@@ -165,23 +169,24 @@ This is deliberately minimal — it's not a full user document. The access token
 
 ### Purpose
 
-The blocklist tracks revoked `jti` values to invalidate tokens before their natural expiry. Required for:
-- **Logout**: blocklist the refresh token's `jti`
-- **Password reset by admin**: blocklist all of a user's active refresh `jti`s
-- **Refresh rotation**: blocklist the old refresh `jti` after issuing a new pair
+The blocklist tracks revoked `jti` values until their natural expiry. It is used for:
+- **Logout**: revoke current access token and refresh cookie token if present
+- **Refresh rotation**: revoke the old refresh token after issuing a new pair
+- **Admin self password reset**: revoke the current admin session when an admin resets their own password
 
 ### Current Implementation (v1): In-Memory
 
 ```python
 # backend/services/token_blocklist.py
-_blocklist: dict[str, float] = {}   # jti → expiry timestamp
+_blocklist: dict[str, float] = {}   # jti -> expiry timestamp
 ```
 
 **Characteristics:**
 - Zero infrastructure overhead
-- Correct for single-process `uvicorn` dev server
-- Data lost on process restart (acceptable: tokens would also expire naturally)
-- **NOT suitable for multi-process production** (each worker has its own dict)
+- Correct for a single-process development server
+- Data lost on process restart
+- Not suitable for multi-process production because each worker has its own dict
+- The app does not currently maintain a persistent per-user refresh-token registry, so admin reset-password does not revoke all sessions for another user
 
 ---
 
@@ -191,10 +196,10 @@ _blocklist: dict[str, float] = {}   # jti → expiry timestamp
 
 ### When to Upgrade
 
-Upgrade from in-memory when **any** of these are true:
-- Running behind **gunicorn with multiple workers** (`-w N` where N > 1)
-- Running behind a **load balancer** with multiple app instances
-- **Regulatory/compliance** requires revocation to be immediately effective across all processes
+Upgrade from in-memory when any of these are true:
+- Running with multiple workers
+- Running multiple app instances behind a load balancer
+- Compliance requires revocation to be effective across every process immediately
 
 ### Option A: MongoDB TTL Collection (Recommended)
 
@@ -204,32 +209,27 @@ Upgrade from in-memory when **any** of these are true:
 // Collection: token_blocklist
 {
   "jti": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  "exp": ISODate("2026-04-26T13:00:00Z"),      // original token expiry
-  "blocked_at": ISODate("2026-04-19T13:00:00Z"),
-  "reason": "logout"                             // "logout" | "password_reset" | "rotation"
+  "exp": ISODate("2026-04-26T13:00:00Z"),
+  "blocked_at": ISODate("2026-04-24T13:00:00Z"),
+  "reason": "logout"
 }
 
-// TTL index — auto-deletes documents after token would have expired anyway
 db.token_blocklist.createIndex({ "exp": 1 }, { expireAfterSeconds: 0 })
-
-// Query index for fast jti lookup
 db.token_blocklist.createIndex({ "jti": 1 }, { unique: true })
 ```
 
 **Migration steps:**
-1. Create the collection and indexes in `_ensure_indexes()` in `db.py`
-2. Replace `token_blocklist.py` functions with async Mongo queries
-3. Add `"token_blocklist"` to `conftest.py` `collections_to_clear`
+1. Create the collection and indexes in `DatabaseManager._ensure_indexes()`
+2. Replace `token_blocklist.py` functions with async PyMongo queries
+3. Add `"token_blocklist"` to the test cleanup collection list
 
 **Trade-offs:**
-- (+) Zero new dependencies
-- (+) TTL index handles cleanup automatically
-- (-) One DB write per logout/refresh rotate
-- (-) One DB read per token verification (mitigated by PyMongo driver connection pooling)
+- (+) Zero new infrastructure
+- (+) TTL index handles cleanup
+- (-) One DB write per logout/refresh rotation
+- (-) One DB read per token verification
 
 ### Option B: Redis SET with TTL
-
-**Why Redis?** Fastest option for high-throughput scenarios.
 
 ```
 SET blocklist:{jti} 1 EX {seconds_until_token_expiry}
@@ -237,13 +237,13 @@ EXISTS blocklist:{jti}
 ```
 
 **Trade-offs:**
-- (+) Sub-millisecond lookups
+- (+) Very fast lookup
 - (-) New infrastructure dependency
-- (-) Needs connection pool management (aioredis)
+- (-) Requires async Redis connection management
 
 ### Recommendation
 
-**Use Option A (Mongo TTL)** unless profiling shows token verification is a bottleneck. The existing Mongo connection and pymongo's AsyncMongoClient handle the load for a tax filing app with moderate traffic.
+Use Mongo TTL first unless profiling shows token verification is a bottleneck.
 
 ---
 
@@ -254,68 +254,68 @@ EXISTS blocklist:{jti}
 ```mermaid
 graph LR
     subgraph Roles
-        A["user"] --> B["Can access own ITR data"]
-        A --> C["Can upload/process documents"]
-        A --> D["Can view own extraction batches"]
+        A["user"] --> B["Can access own filing history"]
+        A --> C["Can upload/process ITR documents"]
+        A --> D["Can delete own completed document slots"]
         E["admin"] --> B
         E --> C
         E --> D
-        E --> F["Can manage all users"]
-        E --> G["Can view all PII"]
-        E --> H["Can force-reset passwords"]
-        E --> I["Can delete users (cascade)"]
+        E --> F["Can list users with decrypted PII"]
+        E --> G["Can change roles and active status"]
+        E --> H["Can reset passwords"]
+        E --> I["Can delete users and blobs"]
     end
 ```
 
-### Document Model
+### User Document Fields
 
-Added to Mongo `users` collection:
-
-| Field | Type | Default | Encrypted? | Notes |
-|-------|------|---------|------------|-------|
-| `role` | `str` | `"user"` | No | Not PII |
-| `is_active` | `bool` | `True` | No | Login rejected if `False` |
+| Field | Type | Encryption | Notes |
+|-------|------|------------|-------|
+| `role` | `str` | Deterministic CSFLE | Exact-match admin counts require deterministic encryption |
+| `is_active` | bool-as-int | Deterministic CSFLE | Decrypted on every protected request |
+| identity fields | `str` | Deterministic CSFLE | PAN/email lookups require exact-match queries |
+| `password` | Argon2 hash string | Random CSFLE | Never returned by API responses |
 
 ---
 
 ## 8. Route Protection Matrix
 
+All routes are mounted under `/api`.
+
 ### Backend (FastAPI)
 
 | Route | Dependency | Notes |
-|-------|-----------|-------|
-| `POST /users/signup` | None | Public |
-| `POST /users/login` | None | Public |
-| `POST /users/refresh` | Cookie-based | Reads refresh token from HttpOnly cookie |
-| `POST /users/logout` | `get_current_user` | Requires valid access token |
-| `GET /users/me` | `get_current_user` | |
-| `POST /itr/upload` | `get_current_user` | `user_id` from JWT sub, not Form |
-| `GET /itr/progress/{id}` | `get_current_user` | + session ownership check |
-| `POST /itr/retry/...` | `get_current_user` | |
-| `POST /itr/force-reparse/...` | `get_current_user` | |
-| `POST /extract/document` | `get_current_user` | |
-| `POST /extract/batch` | `get_current_user` | + stores `created_by_user_id` |
-| `GET /extract/status/{id}` | `get_current_user` | + batch ownership filter |
-| `GET /admin/users` | `require_admin` | Full PII visible |
-| `GET /admin/users/{id}` | `require_admin` | |
-| `PATCH /admin/users/{id}` | `require_admin` | |
-| `PATCH /admin/users/{id}/role` | `require_admin` | Last-admin guard |
-| `POST /admin/users` | `require_admin` | |
-| `POST /admin/users/{id}/reset-password` | `require_admin` | Blocklists user's tokens |
-| `DELETE /admin/users/{id}` | `require_admin` | Cascade delete |
+|-------|------------|-------|
+| `POST /api/v1/users/signup` | None | Public |
+| `POST /api/v1/users/login` | None | Public OAuth2 form login using PAN as `username` |
+| `POST /api/v1/users/refresh` | Refresh cookie | Rotates refresh token and returns new access token |
+| `POST /api/v1/users/logout` | `get_current_user` | Revokes access token and refresh cookie token if present |
+| `GET /api/v1/users/me` | `get_current_user` | Returns masked user profile |
+| `POST /api/v1/itr/upload` | `get_current_user` | Uses JWT `sub` as owner; rejects completed duplicate document slots |
+| `GET /api/v1/itr/progress/{session_id}` | `get_current_user` | SSE stream scoped to session owner |
+| `GET /api/v1/filing/history` | `get_current_user` | Lists the current user's filing attempts |
+| `GET /api/v1/filing/history/{assessment_year}` | `get_current_user` | Returns one filing attempt for the current user |
+| `DELETE /api/v1/filing/history/{assessment_year}/{doc_type}` | `get_current_user` | Deletes the user's document slot and associated blobs |
+| `GET /api/v1/admin/users` | `require_admin` | Paginated user list with decrypted PII except password |
+| `PATCH /api/v1/admin/users/{user_id}/role` | `require_admin` | Last-admin guard |
+| `PATCH /api/v1/admin/users/{user_id}/status` | `require_admin` | Self-deactivation and last-admin guards |
+| `DELETE /api/v1/admin/users/{user_id}` | `require_admin` | Self-delete and last-admin guards; cascade delete |
+| `POST /api/v1/admin/users/bulk-delete` | `require_admin` | Skips self-deletion |
+| `POST /api/v1/admin/users/{user_id}/reset-password` | `require_admin` | Validates strength, hashes, encrypts, updates password |
 
 ### Frontend (React)
 
 | Route | Guard | Notes |
 |-------|-------|-------|
-| `/` | None | Redirects away if already authenticated |
+| `/` | None | Auth page |
 | `/itr-select` | `ProtectedRoute` | Auth check only |
-| `/upload` | `ProtectedRoute` | Auth check + page-level `ay` guard |
-| `/progress` | `ProtectedRoute` | Auth check + page-level `sessionId` guard |
+| `/upload` | `ProtectedRoute` | Auth check plus page-level AY guard |
+| `/progress` | `ProtectedRoute` | Auth check plus page-level `sessionId` guard |
 | `/summary` | `ProtectedRoute` | Auth check |
-| `/admin/users` | `ProtectedRoute requireAdmin` | Auth + role check |
+| `/filing-history` | `ProtectedRoute` | Auth check |
+| `/admin/users` | `ProtectedRoute requireAdmin` | Auth and client-side admin role check |
 
-> **Design principle**: `ProtectedRoute` is an **auth gate**, not a flow gate. Authenticated users can type any URL and reach the page. Page-specific prerequisites (like "AY must be selected") are handled by individual page components.
+> **Design principle**: `ProtectedRoute` is an auth/admin gate, not a full flow gate. Page-specific prerequisites are handled by page components.
 
 ---
 
@@ -323,42 +323,41 @@ Added to Mongo `users` collection:
 
 ```mermaid
 flowchart TD
-    A["App mounts"] --> B{"Refresh cookie exists?"}
-    B -->|"Yes"| C["POST /users/refresh<br/>(credentials: include)"]
-    C -->|"200"| D["Store access_token in state<br/>Set user + isAuthenticated"]
-    C -->|"401/fail"| E["Stay logged out"]
-    B -->|"No/Unknown"| E
-    E --> F["Show AuthPage (/)"]
+    A["App mounts"] --> B["POST /api/v1/users/refresh<br/>(credentials: include)"]
+    B -->|"200"| C["Store access_token in state"]
+    C --> D["GET /api/v1/users/me"]
+    D --> E["Set user + isAuthenticated"]
+    B -->|"401/fail"| F["Stay logged out"]
+    F --> G["Show AuthPage (/)"]
 
-    D --> G["Render ProtectedRoute children"]
+    E --> H["Render ProtectedRoute children"]
+    H --> I{"API call returns 401?"}
+    I -->|"Yes"| J["Try refresh once"]
+    J -->|"200"| K["Retry original request"]
+    J -->|"Fail"| L["logout() + redirect to /"]
+    I -->|"No"| M["Continue normally"]
 
-    G --> H{"API call returns 401?"}
-    H -->|"Yes"| I["Try refresh once"]
-    I -->|"200"| J["Retry original request"]
-    I -->|"Fail"| K["logout() + redirect to /"]
-    H -->|"No"| L["Continue normally"]
-
-    style D fill:#22c55e,color:#fff
-    style K fill:#ef4444,color:#fff
+    style E fill:#22c55e,color:#fff
+    style L fill:#ef4444,color:#fff
 ```
 
 ---
 
 ## 10. Security Threat Model
 
-| Threat | Mitigation |
-|--------|------------|
-| **XSS steals access token** | Access token is in JS memory, not `localStorage`. If React state is compromised, XSS has full app control anyway — mitigate via CSP headers and input sanitization. |
-| **XSS steals refresh token** | Impossible — `HttpOnly` cookie is invisible to JavaScript. |
-| **CSRF triggers refresh** | `SameSite=Strict` prevents cookie from being sent on cross-origin requests. Path-scoped to `/api/v1/users/refresh`. |
-| **Token replay after logout** | `jti` blocklist prevents reuse of revoked tokens. |
-| **Token replay after password reset** | Admin reset-password blocklists all of the user's active refresh `jti`s. |
-| **Spoofed `user_id` in upload** | `user_id` removed from Form data; extracted exclusively from JWT `sub`. |
-| **Cross-user SSE eavesdrop** | Session `owner_user_id` validated before subscribing to progress stream. |
-| **Cross-user batch polling** | `get_batch_status` filters by `created_by_user_id` from JWT. |
-| **URL manipulation to admin pages** | `ProtectedRoute requireAdmin` checks role client-side; API endpoint returns 403 for non-admin JWT. |
-| **Expired token in URL bar** | 401 → silent refresh → retry. If refresh fails → logout + redirect. |
-| **Brute-force login** | Argon2 hashing (3 iterations, 64MB memory cost) makes offline attacks expensive. Rate limiting deferred to v2. |
+| Threat | Current mitigation |
+|--------|--------------------|
+| **Access token persistence** | Access token lives in React/module memory, not `localStorage` |
+| **Refresh token theft by JS** | `HttpOnly` cookie blocks direct JavaScript reads |
+| **CSRF against refresh** | Production uses `SameSite=Strict` and a path-scoped refresh cookie |
+| **Token replay after logout** | In-memory `jti` blocklist rejects revoked tokens in the same process |
+| **Refresh replay after rotation** | Old refresh `jti` is blocklisted during refresh |
+| **Spoofed upload ownership** | Upload owner comes from JWT `sub`, not form data |
+| **Cross-user SSE eavesdrop** | Session owner is checked before streaming state |
+| **Cross-user filing history access** | Filing queries filter by authenticated `user_id` |
+| **URL manipulation to admin pages** | Frontend checks role; backend returns 403 through `require_admin` |
+| **Inactive account reuse** | `get_current_user` decrypts and checks `is_active` on every protected request |
+| **Password brute force/offline attack** | Argon2 hashing with 64 MB memory cost; login rate limiting is not yet implemented |
 
 ---
 
@@ -368,30 +367,29 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["DELETE /admin/users/{id}"] --> B{"Is last admin?"}
-    B -->|"Yes"| C["403 Forbidden"]
-    B -->|"No"| D{"Is self?"}
-    D -->|"Yes"| E["403 Cannot delete self"]
-    D -->|"No"| F["Mongo: delete users doc"]
-    F --> G["Mongo: delete documents where user_oid = id"]
-    G --> H["Mongo: delete documents where created_by_user_id = id"]
-    H --> I["Azure: delete_prefix user_id/"]
-    I -->|"Success"| J["200 OK"]
-    I -->|"Blob error"| K["200 OK + warning logged<br/>(orphan blobs tolerated)"]
+    A["DELETE /api/v1/admin/users/{id}"] --> B{"Is self?"}
+    B -->|"Yes"| C["400 Cannot delete yourself"]
+    B -->|"No"| D{"Would remove last active admin?"}
+    D -->|"Yes"| E["400 Cannot delete last active admin"]
+    D -->|"No"| F["Delete filing_attempts by user_id"]
+    F --> G["Delete Azure blobs under user prefix"]
+    G --> H["Delete user profile"]
+    H --> I["200 with delete counts"]
 
     style C fill:#ef4444,color:#fff
     style E fill:#ef4444,color:#fff
-    style J fill:#22c55e,color:#fff
-    style K fill:#f59e0b,color:#000
+    style I fill:#22c55e,color:#fff
 ```
+
+The cascade is sequential, not a Mongo transaction. If blob deletion fails, the request can fail after filing records are deleted; retry/compensation should be added before production hardening.
 
 ### Force Reset Password
 
-1. Admin submits `POST /admin/users/{id}/reset-password` with `{ new_password: "..." }`
-2. Server validates password strength (same rules as signup)
-3. Hash with Argon2 → encrypt with CSFLE → `$set` on user doc
-4. Blocklist all active refresh tokens for that user (forces re-login)
-5. Return 200
+1. Admin submits `POST /api/v1/admin/users/{id}/reset-password` with `{ "new_password": "..." }`
+2. Server validates password strength using the same complexity rules as signup
+3. Server hashes with Argon2 via a worker thread
+4. Server encrypts the hash with random CSFLE and stores it in `users.password`
+5. If the admin reset their own password, the current access/refresh tokens are revoked and the refresh cookie is cleared
 
 ---
 
@@ -399,9 +397,10 @@ flowchart TD
 
 | Item | Priority | Notes |
 |------|----------|-------|
-| Rate limiting (login) | Medium | Per-IP + per-PAN. fastapi-limiter or custom middleware. |
-| Token blocklist → Mongo TTL | Medium | See [§6](#6-token-blocklist-scaling) for migration guide. |
-| RS256 signing | Low | Only needed if moving to multi-service architecture. |
-| Email notifications | Low | Password reset alerts, suspicious login notifications. |
-| Audit log | Medium | Track admin actions (role changes, deletions, password resets). |
-| Account lockout | Medium | Lock account after N failed login attempts. |
+| Rate limiting (login) | High | Per-IP and per-PAN throttling before production |
+| Token blocklist to Mongo TTL | Medium | See [section 6](#6-token-blocklist-scaling) |
+| Per-user refresh session registry | Medium | Needed to revoke all sessions on admin password reset |
+| Transactional/compensating cascade delete | Medium | Avoid partial deletion across Mongo and Blob Storage |
+| Audit log | Medium | Track admin actions such as role changes, deletions, password resets |
+| CSP and XSS hardening | Medium | Reduce token misuse risk from active script injection |
+| RS256 signing | Low | Useful if token validation moves across services |

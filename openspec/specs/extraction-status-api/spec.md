@@ -1,16 +1,24 @@
-## ADDED Requirements
+## Capability: Extraction Status API
 
-### Requirement: Batch Status Retrieval
-The system must provide an endpoint to retrieve the current status of all documents associated with a `batch_id`.
+### Requirement: Real-Time Session Status
+The system must provide a Server-Sent Events endpoint for the current status of an in-memory ITR processing session.
 
-#### Scenario: Polling for status
-- **WHEN** the frontend requests `GET /api/extract/status/{batch_id}`
-- **THEN** it should receive a list of documents with their current status (`queued`, `extracting`, `completed`, `error`) and extracted data (if completed).
+#### Scenario: Streaming progress
+- **WHEN** the frontend requests `GET /api/v1/itr/progress/{session_id}` with a valid Bearer token
+- **THEN** it receives session state containing each document's queued/extracting/completed/failed status and page counts
+- **AND** events are streamed only to the session owner.
+
+### Requirement: Persistent Filing Status
+The system must provide persistent filing history endpoints after or during extraction.
+
+#### Scenario: Reading filing history
+- **WHEN** the frontend requests `GET /api/v1/filing/history`
+- **THEN** it receives the authenticated user's filing attempts and document completion flags.
 
 ### Requirement: Granular Progress Updates
-The system must update individual document statuses as they transition through the extraction pipeline.
+The system must update individual document status as pages transition through the extraction pipeline.
 
 #### Scenario: Document finishes extraction
-- **WHEN** the `llm_service` successfully extracts data from a document
-- **THEN** its status in the database should be updated to `completed` and the `extracted_data` field populated.
-- **AND** the next status poll should reflect this change.
+- **WHEN** all expected pages for a document are complete
+- **THEN** `filing_attempts.documents[].is_extraction_complete` is updated to `true`
+- **AND** the next SSE event and filing-history request reflect completion.

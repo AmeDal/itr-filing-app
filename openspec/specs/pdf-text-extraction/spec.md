@@ -1,25 +1,25 @@
-## ADDED Requirements
+## Capability: PDF Text Extraction
 
-### Requirement: Detect textual content in PDF
-The system SHALL use PyMuPDF (`fitz`) to detect if a PDF document contains embedded textual content before deciding whether to perform OCR (image conversion).
+### Requirement: Detect Textual Content in PDF
+The PDF helper service SHALL use PyMuPDF (`fitz`) to detect embedded textual content before deciding whether to return direct text or rendered page images.
 
 #### Scenario: PDF contains readable text
-- **WHEN** a PDF file with extractable text is uploaded
-- **THEN** the system MUST detect the presence of text and proceed with direct text extraction
-- **AND** the PyMuPDF parsing and text extraction work MUST execute off the event-loop thread
+- **WHEN** a PDF file with extractable text is processed by `extract_pdf_payload`
+- **THEN** the service detects text and returns it for direct LLM use
+- **AND** PyMuPDF parsing and text extraction execute off the event-loop thread.
 
 #### Scenario: PDF is scanned or image-only
-- **WHEN** a PDF file with no extractable text is uploaded
-- **THEN** the system MUST fallback to the existing image-conversion (OCR) workflow
-- **AND** the page rasterization work MUST execute off the event-loop thread
+- **WHEN** a PDF file has no sufficient extractable text
+- **THEN** the service falls back to in-memory page rasterization
+- **AND** page rasterization executes off the event-loop thread.
 
-### Requirement: Direct text extraction for LLM
-The system SHALL extract all textual content from the PDF and send it as a text part to the LLM for data extraction, rather than converting pages to images.
+### Requirement: Direct Text Extraction for LLM Helpers
+The direct PAN/Aadhar extraction helpers SHALL send extracted text to Gemini when sufficient text is available.
 
-#### Scenario: Text extraction for PAN/Aadhar
+#### Scenario: Text extraction for PAN/Aadhar helper
 - **WHEN** text is detected in the PDF
-- **THEN** the system MUST extract the text and include it in the `contents` list sent to the Gemini API as a `types.Part.from_text` or equivalent string payload
+- **THEN** the helper includes that text in the Gemini contents payload.
 
 #### Scenario: Text extraction fails or is insufficient
-- **WHEN** text extraction returns minimal or garbled content (less than a reasonable threshold, e.g., 50 characters)
-- **THEN** the system SHALL fallback to image conversion to ensure extraction accuracy
+- **WHEN** text extraction returns minimal or garbled content below the configured threshold
+- **THEN** the helper falls back to image conversion.
