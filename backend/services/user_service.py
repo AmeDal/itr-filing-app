@@ -4,7 +4,7 @@ from bson import ObjectId
 
 from backend.db import DatabaseManager, generate_oid
 from backend.schemas.user_schema import UserCreateRequest, UserLoginRequest, UserResponse
-from backend.security import hash_password, verify_password
+from backend.security import async_hash_password, async_verify_password
 from backend.services.crypto_service import CryptoService
 from backend.utils import now_ist
 
@@ -83,7 +83,7 @@ async def create_user(req: UserCreateRequest) -> UserResponse:
         "email":
         enc_email,
         "password":
-        await CryptoService.encrypt_random(hash_password(req.password)),
+        await CryptoService.encrypt_random(await async_hash_password(req.password)),
         "role":
         await CryptoService.encrypt_deterministic(getattr(req, "role",
                                                           "user")),
@@ -112,7 +112,7 @@ async def login_user(req: UserLoginRequest) -> Optional[UserResponse]:
     if user_doc and "password" in user_doc:
         decrypted_hash = await CryptoService.decrypt_field(user_doc["password"]
                                                            )
-        if verify_password(req.password, decrypted_hash):
+        if await async_verify_password(req.password, decrypted_hash):
             decrypted_doc = await decrypt_user_doc(user_doc)
             return UserResponse(**decrypted_doc)
 

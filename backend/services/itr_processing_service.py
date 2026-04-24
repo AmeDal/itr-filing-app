@@ -235,3 +235,43 @@ class ITRProcessingService:
                                                page_index,
                                                total_pages,
                                                status="failed_page")
+
+    @classmethod
+    async def process_session(cls, session_id: str, user_id: str, ay: str, processed_files: List[Dict[str, Any]]):
+        """
+        Orchestrates processing for all documents in a session concurrently.
+        """
+        logger.info(f"Starting concurrent processing orchestrator for session {session_id}")
+        tasks = []
+        for pf in processed_files:
+            tasks.append(
+                cls.process_document(
+                    session_id, user_id, ay, pf["type"], pf["name"], pf["bytes"]
+                )
+            )
+        
+        # Run all documents in parallel. return_exceptions=True ensures that one failure
+        # doesn't prevent other documents from being processed.
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Inspect results and log any exceptions
+        failed_documents = []
+        for i, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"Document processing failed for session {session_id}, "
+                    f"document index {i}: {result}",
+                    exc_info=result
+                )
+                failed_documents.append({
+                    "index": i,
+                    "error": str(result),
+                    "type": type(result).__name__
+                })
+
+        if failed_documents:
+            logger.warning(
+                f"Session {session_id}: {len(failed_documents)} document(s) failed processing"
+            )
+
+        logger.info(f"Concurrent processing orchestrator finished for session {session_id}")

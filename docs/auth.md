@@ -243,7 +243,7 @@ EXISTS blocklist:{jti}
 
 ### Recommendation
 
-**Use Option A (Mongo TTL)** unless profiling shows token verification is a bottleneck. The existing Mongo connection and Motor client handle the load for a tax filing app with moderate traffic.
+**Use Option A (Mongo TTL)** unless profiling shows token verification is a bottleneck. The existing Mongo connection and pymongo's AsyncMongoClient handle the load for a tax filing app with moderate traffic.
 
 ---
 

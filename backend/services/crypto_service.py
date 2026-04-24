@@ -32,17 +32,10 @@ class CryptoService:
     def initialize(cls, mongo_uri: str, master_key_b64: str,
                    key_vault_namespace: str) -> None:
         """
-        Sets up the CSFLE infrastructure synchronously.
-
-        Steps:
-        1. Decode and validate the 96-byte local KMS master key.
-        2. Create a sync MongoClient for the key vault collection.
-        3. Build a `ClientEncryption` instance with the local KMS provider.
-        4. Create or retrieve the Data Encryption Key (DEK) by altName.
-
-        This is intentionally synchronous — it is called once from
-        `DatabaseManager.initialize()` inside FastAPI's lifespan startup,
-        which is already in an async context via `asyncio.to_thread`.
+        This is intentionally synchronous - it is called from
+        `DatabaseManager.initialize()` during startup, where it MUST be 
+        explicitly offloaded (e.g., via `asyncio.to_thread`) to avoid 
+        blocking the main event loop.
         """
         if cls._client_encryption is not None:
             logger.warning("CryptoService already initialized.")
@@ -103,7 +96,7 @@ class CryptoService:
 
     @classmethod
     def _encrypt_sync(cls, value: Any, algorithm: str) -> Binary:
-        """Synchronous encrypt — called via asyncio.to_thread."""
+        """Synchronous encrypt - called via asyncio.to_thread."""
         if cls._client_encryption is None or cls._data_key_id is None:
             raise RuntimeError(
                 "CryptoService not initialized. Call initialize() first.")
@@ -120,7 +113,7 @@ class CryptoService:
 
     @classmethod
     def _decrypt_sync(cls, ciphertext: Binary) -> Any:
-        """Synchronous decrypt — called via asyncio.to_thread."""
+        """Synchronous decrypt - called via asyncio.to_thread."""
         if cls._client_encryption is None:
             raise RuntimeError(
                 "CryptoService not initialized. Call initialize() first.")
