@@ -10,12 +10,34 @@ from backend.services.pdf_service import PDFPasswordRequired, extract_pdf_payloa
 from backend.schemas.extraction_schema import AadharExtractionResponse, PanExtractionResponse
 from backend.settings import get_settings
 
+_client: Optional[genai.Client] = None
 
 def get_client() -> genai.Client:
-    settings = get_settings()
-    return genai.Client(api_key=settings.gemini_api_key)
+    """
+    Get or create a singleton instance of the Gemini client.
+    Note: This is intended to be called within an async context where the event loop is running.
+    """
+    global _client
+    if _client is None:
+        settings = get_settings()
+        _client = genai.Client(api_key=settings.gemini_api_key)
+    return _client
 
 
+async def close_client():
+    """
+    Explicitly close the Gemini client to release network resources.
+    Should be called during application shutdown.
+    """
+    global _client
+    if _client is not None:
+        logger.info("Closing Gemini client...")
+        try:
+            await _client.aio.aclose()
+        except Exception as e:
+            logger.error(f"Error closing Gemini client: {e}")
+        finally:
+            _client = None
 async def get_pdf_content(image_bytes: bytes,
                           password: Optional[str] = None) -> Tuple[bool, List]:
     """

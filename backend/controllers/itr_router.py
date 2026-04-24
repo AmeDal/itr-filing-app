@@ -94,12 +94,11 @@ async def upload_documents(
     # Ensure AY is stored for recovery persistence task
     SessionManager._sessions[session_id]["assessment_year"] = ay
     
-    # Start background tasks
-    for pf in processed_files:
-        background_tasks.add_task(
-            ITRProcessingService.process_document,
-            session_id, current_user.id, ay, pf["type"], pf["name"], pf["bytes"]
-        )
+    # Start background task orchestrator for concurrent processing
+    background_tasks.add_task(
+        ITRProcessingService.process_session,
+        session_id, current_user.id, ay, processed_files
+    )
 
     return {"session_id": session_id, "message": "Upload successful. Processing started."}
 
