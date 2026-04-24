@@ -5,7 +5,7 @@ from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from backend.logger import logger
-from backend.security import hash_password
+from backend.security import async_hash_password
 from backend.services.crypto_service import CryptoService
 from backend.settings import get_settings
 from backend.utils import mask_uri, now_ist
@@ -119,7 +119,7 @@ class DatabaseManager:
                     seed_data[field] = await CryptoService.encrypt_deterministic(seed_data[field])
 
             plain_pwd = seed_data["password"]
-            hashed_pwd = hash_password(plain_pwd)
+            hashed_pwd = await async_hash_password(plain_pwd)
             seed_data["password"] = await CryptoService.encrypt_random(hashed_pwd)
 
             user_doc = {

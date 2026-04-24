@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from passlib.context import CryptContext
@@ -51,6 +52,13 @@ def hash_password(password: str) -> str:
     return pwd_context.hash(password)
 
 
+async def async_hash_password(password: str) -> str:
+    """
+    Async version of hash_password that runs in a separate thread.
+    """
+    return await asyncio.to_thread(hash_password, password)
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
     Verifies a plain-text password against a stored Argon2 or bcrypt hash.
@@ -58,3 +66,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Supports both Argon2 and bcrypt hashes for backward compatibility.
     """
     return pwd_context.verify(plain_password, hashed_password)
+
+
+async def async_verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Async version of verify_password that runs in a separate thread.
+    """
+    return await asyncio.to_thread(verify_password, plain_password, hashed_password)

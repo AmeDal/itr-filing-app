@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from backend.auth_deps import UserPrincipal, oauth2_scheme, require_admin
 from backend.db import get_db
 from backend.logger import logger
-from backend.security import hash_password, validate_password_strength
+from backend.security import async_hash_password, validate_password_strength
 from backend.services import user_service
 from backend.services.auth_service import revoke_token
 from backend.services.crypto_service import CryptoService
@@ -246,7 +246,7 @@ async def force_reset_password(
     """
     Forces a password reset for a user.
     """
-    hashed_pwd = hash_password(req.new_password)
+    hashed_pwd = await async_hash_password(req.new_password)
     encrypted_pwd = await CryptoService.encrypt_random(hashed_pwd)
 
     try:
