@@ -10,9 +10,7 @@ from backend.services.pdf_service import PDFPasswordRequired, extract_pdf_payloa
 from backend.schemas.extraction_schema import AadharExtractionResponse, PanExtractionResponse
 from backend.settings import get_settings
 
-
 _client: Optional[genai.Client] = None
-
 
 def get_client() -> genai.Client:
     """
@@ -40,8 +38,6 @@ async def close_client():
             logger.error(f"Error closing Gemini client: {e}")
         finally:
             _client = None
-
-
 async def get_pdf_content(image_bytes: bytes,
                           password: Optional[str] = None) -> Tuple[bool, List]:
     """
