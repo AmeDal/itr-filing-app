@@ -2,7 +2,8 @@ import hashlib
 from typing import Optional
 
 from bson import ObjectId
-from motor.motor_asyncio import AsyncIOMotorClient
+import asyncio
+from pymongo import AsyncMongoClient
 
 from backend.logger import logger
 from backend.security import async_hash_password
@@ -41,10 +42,10 @@ def generate_oid(first_name: str, middle_name: str, last_name: str,
 
 class DatabaseManager:
     """
-    Singleton manager for MongoDB connection using Motor.
-    Obsessively async and lifespan-safe.
+    Singleton manager for MongoDB connection using native PyMongo AsyncMongoClient.
+    Lifespan-safe and concurrency-aware.
     """
-    client: Optional[AsyncIOMotorClient] = None
+    client: Optional[AsyncMongoClient] = None
     db = None
 
     @classmethod
@@ -62,15 +63,16 @@ class DatabaseManager:
         logger.info(f"Connecting to MongoDB at {masked_uri}")
 
         try:
-            cls.client = AsyncIOMotorClient(settings.mongo_uri)
+            cls.client = AsyncMongoClient(settings.mongo_uri)
             cls.db = cls.client[settings.mongo_db_name]
 
             # Verify connection with a ping
             await cls.client.admin.command('ping')
             logger.info("Successfully connected to MongoDB")
 
-            # Initialize CryptoService for CSFLE
-            CryptoService.initialize(
+            # Initialize CryptoService for CSFLE (offloaded to thread to avoid blocking startup)
+            await asyncio.to_thread(
+                CryptoService.initialize,
                 mongo_uri=settings.mongo_uri,
                 master_key_b64=settings.csfle_master_key,
                 key_vault_namespace=settings.csfle_key_vault_namespace
@@ -157,7 +159,7 @@ class DatabaseManager:
         """Closes the MongoDB connection."""
         CryptoService.close()
         if cls.client:
-            cls.client.close()
+            await cls.client.close()
             cls.client = None
             cls.db = None
             logger.info("MongoDB connection closed.")

@@ -31,7 +31,7 @@ graph TB
         API["api.js<br/>(fetchWithAuth + SSE)"]
     end
 
-    subgraph Backend ["Backend (FastAPI + Motor)"]
+    subgraph Backend ["Backend (FastAPI + PyMongo Async)"]
         AuthDeps["auth_deps.py<br/>(get_current_user, require_admin)"]
         UserRouter["user_router.py<br/>(login, signup, refresh, logout)"]
         ITRRouter["itr_router.py<br/>(upload, progress SSE)"]
@@ -142,8 +142,8 @@ sequenceDiagram
 | **Auth state** | React Context + in-memory tokens | No external state library needed for auth |
 | **SSE client** | `@microsoft/fetch-event-source` | Supports custom headers (Bearer) unlike native `EventSource` |
 | **Backend** | FastAPI + Uvicorn | Async-native, auto-docs, Pydantic validation |
-| **Database** | MongoDB Atlas + Motor | Async driver, flexible schema for document extraction |
-| **Encryption** | CSFLE (Client-Side Field Level) | PII encrypted at rest; deterministic for indexed lookups |
+| **Database** | MongoDB Atlas + PyMongo | Native `AsyncMongoClient` (v4.9+), flexible schema |
+| **Encryption** | CSFLE (Client-Side Field Level) | PII encrypted at rest; sync boundary offloaded to `asyncio.to_thread` |
 | **Password hashing** | Argon2 (via passlib) | Winner of PHC 2015; 64MB memory cost |
 | **JWT** | PyJWT[crypto] | Actively maintained; HS256 signing |
 | **Blob storage** | Azure Blob Storage (async) | Per-user/AY/doc-type hierarchy; MD5 dedup caching |

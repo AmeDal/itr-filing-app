@@ -52,7 +52,7 @@ async def db_lifecycle(event_loop):
     # CLEANUP PHASE: Destroy the ephemeral test database
     await DatabaseManager.close()
 
-    # Use sync client for total destruction (bypassing Motor lifecycle issues during shutdown)
+    # Use sync client for total destruction
     sync_client = MongoClient(settings.mongo_uri)
     try:
         # Attempt to drop the entire database

@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ITR Filing App",
-    description="Production-grade ITR Filing Application with Async MongoDB",
+    description="Production-grade ITR Filing Application with native Async MongoDB and CSFLE",
     lifespan=lifespan
 )
 api_router = APIRouter(prefix="/api")
